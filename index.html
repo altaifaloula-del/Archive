@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>وسيط الأرشفة</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&family=Readex+Pro:wght@500;700&display=swap">
+<style>
+/* Layout: one working column — settings card, file list, then the send bar */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --ink:#17221f; --muted:#5d6b67;
+  --line:#d9e1de; --accent:#0f6b55; --accent-ink:#ffffff; --soft:#e3efeb; --warn:#9a5b00;
+  --f-display:"Readex Pro","IBM Plex Sans Arabic",Tahoma,sans-serif;
+  --f-body:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#101614; --surface:#18211e; --ink:#e7eeeb; --muted:#9aaba5;
+  --line:#2a3633; --accent:#3fb894; --accent-ink:#06231b; --soft:#1d2e28; --warn:#e3a24a; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--f-body);
+  padding-block:20px 120px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header h1{font:700 1.5rem/1.3 var(--f-display);margin:0;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.card h2{font:700 1rem var(--f-display);margin:0}
+.step{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--soft);color:var(--accent);font:700 .8rem var(--f-display);margin-left:8px}
+label{font-weight:500;font-size:.9rem;display:block;margin-bottom:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:460px){.grid{grid-template-columns:1fr}}
+select,input[type=date],input[type=text]{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:46px}
+select:focus,input:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:8px 14px;font:inherit;font-size:.9rem;cursor:pointer;min-height:40px}
+.chip[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.pick{display:flex;align-items:center;justify-content:center;gap:10px;border:2px dashed var(--line);border-radius:12px;padding:22px;cursor:pointer;color:var(--muted);text-align:center}
+.pick strong{color:var(--accent)}
+#fileIn{position:absolute;width:1px;height:1px;opacity:0}
+ul.files{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+ul.files li{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.old{color:var(--muted);font-size:.8rem;overflow-wrap:anywhere;min-width:0}
+.new{font-weight:700;overflow-wrap:anywhere;min-width:0;direction:rtl}
+.rm{grid-row:1/3;grid-column:2;align-self:center;background:none;border:0;color:var(--muted);font-size:1.3rem;cursor:pointer;width:36px;height:36px;border-radius:8px}
+.path{display:flex;gap:8px;align-items:center;background:var(--soft);border-radius:10px;padding:10px 12px}
+.path code{flex:1;font-family:var(--f-body);font-weight:500;overflow-wrap:anywhere;min-width:0}
+.btn{font:700 1rem var(--f-display);border:0;border-radius:12px;padding:12px 18px;cursor:pointer;min-height:48px}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line);font-size:.85rem;min-height:38px;padding:6px 12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.bar{position:fixed;inset:auto 0 0 0;background:var(--surface);border-top:1px solid var(--line);
+  padding-block:12px calc(12px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.bar .in{max-width:640px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.bar .btn.primary{flex:1}
+.note{font-size:.85rem;color:var(--muted)}
+.msg{font-size:.9rem;padding:10px 12px;border-radius:10px;background:var(--soft)}
+.msg.warn{color:var(--warn)}
+.empty{color:var(--muted);font-size:.9rem;text-align:center;padding:6px}
+details summary{cursor:pointer;font-weight:500}
+ol.log{margin:8px 0 0;padding-inline-start:20px;font-size:.85rem;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>وسيط الأرشفة إلى زوهو</h1>
+    <p>اختر الملفات من التنزيلات، صنّفها، ثم أرسلها إلى WorkDrive بأسماء موحّدة.</p>
+  </header>
+
+  <section class="card">
+    <h2><span class="step">1</span>التصنيف</h2>
+    <div>
+      <label>الفرع</label>
+      <div class="chips" id="branches"></div>
+    </div>
+    <div>
+      <label>نوع المستند</label>
+      <div class="chips" id="types"></div>
+    </div>
+    <div class="grid">
+      <div><label for="docDate">تاريخ المستند</label><input type="date" id="docDate"></div>
+      <div><label for="docNote">وصف قصير (اختياري)</label><input type="text" id="docNote" placeholder="مثال: المراعي أو 1045" maxlength="30"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">2</span>الملفات</h2>
+    <label class="pick" for="fileIn"><span><strong>اضغط لاختيار الملفات</strong><br><span class="note">افتح «التنزيلات» من القائمة وحدّد ملفًا أو أكثر</span></span></label>
+    <input type="file" id="fileIn" multiple>
+    <ul class="files" id="list"></ul>
+    <p class="empty" id="empty">لم تُختر ملفات بعد.</p>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">3</span>المجلد في WorkDrive</h2>
+    <div class="path"><code id="path"></code><button class="btn ghost" id="copyPath" type="button">نسخ</button></div>
+    <p class="note">عند فتح WorkDrive من نافذة المشاركة اختر هذا المجلد أو أنشئه مرة واحدة.</p>
+    <p class="msg" id="msg" hidden></p>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>سجل آخر الإرسالات على هذا الجهاز</summary>
+      <ol class="log" id="log"></ol>
+    </details>
+  </section>
+</div>
+
+<div class="bar"><div class="in">
+  <button class="btn primary" id="send" type="button" disabled>إرسال إلى WorkDrive</button>
+  <button class="btn ghost" id="clear" type="button">مسح</button>
+</div></div>
+
+<script>
+const BRANCHES=[{n:"طيبة والنسيم",k:"طيبة-النسيم"},{n:"كيلو 14",k:"كيلو14"},{n:"الأجواد",k:"الأجواد"},{n:"الحمدانية",k:"الحمدانية"},{n:"الإدارة",k:"الإدارة"}];
+const TYPES=["فاتورة مشتريات","فاتورة مبيعات","كشف بنك","ضريبة","رواتب","إيصال","عقد","أخرى"];
+const st={branch:BRANCHES[0],type:TYPES[0],files:[]};
+const $=id=>document.getElementById(id);
+
+function store(k,v){try{if(v===undefined)return JSON.parse(localStorage.getItem(k));localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
+
+function chips(el,items,label,get,set){
+  el.innerHTML="";
+  items.forEach(it=>{const b=document.createElement("button");b.type="button";b.className="chip";b.textContent=label(it);
+    b.setAttribute("aria-pressed",get()===it);b.onclick=()=>{set(it);chips(el,items,label,get,set);render()};el.appendChild(b)});
+}
+const clean=s=>s.trim().replace(/[\\/:*?"<>|]+/g,"").replace(/\s+/g,"-");
+function ext(name){const i=name.lastIndexOf(".");return i>0?name.slice(i):""}
+function newName(f,i){
+  const d=$("docDate").value||new Date().toISOString().slice(0,10);
+  const note=clean($("docNote").value);
+  const seq=st.files.length>1?"_"+String(i+1).padStart(2,"0"):"";
+  return [st.branch.k,clean(st.type),d].join("_")+(note?"_"+note:"")+seq+ext(f.name).toLowerCase();
+}
+function folder(){const d=$("docDate").value||new Date().toISOString().slice(0,10);return `${st.branch.n} / ${d.slice(0,7)} / ${st.type}`}
+
+function render(){
+  const ul=$("list");ul.innerHTML="";
+  st.files.forEach((f,i)=>{const li=document.createElement("li");
+    const n=document.createElement("div");n.className="new";n.textContent=newName(f,i);
+    const o=document.createElement("div");o.className="old";o.textContent="الأصلي: "+f.name;
+    const r=document.createElement("button");r.className="rm";r.type="button";r.setAttribute("aria-label","إزالة");r.textContent="×";
+    r.onclick=()=>{st.files.splice(i,1);render()};li.append(n,r,o);ul.appendChild(li)});
+  $("empty").hidden=st.files.length>0;
+  $("send").disabled=!st.files.length;
+  $("send").textContent=st.files.length?`إرسال ${st.files.length} ملف إلى WorkDrive`:"إرسال إلى WorkDrive";
+  $("path").textContent=folder();
+}
+function say(t,warn){const m=$("msg");m.textContent=t;m.className="msg"+(warn?" warn":"");m.hidden=false}
+
+function renderLog(){const l=store("arch-log")||[];const ol=$("log");ol.innerHTML="";
+  if(!l.length){ol.innerHTML="<li>لا يوجد بعد.</li>";return}
+  l.slice(0,20).forEach(e=>{const li=document.createElement("li");li.textContent=`${e.t} — ${e.c} ملف — ${e.p}`;ol.appendChild(li)})}
+function addLog(){const l=store("arch-log")||[];l.unshift({t:new Date().toLocaleString("ar-SA"),c:st.files.length,p:folder()});store("arch-log",l.slice(0,50));renderLog()}
+
+async function copyText(t){try{await navigator.clipboard.writeText(t);say("تم نسخ مسار المجلد.")}catch(e){
+  const r=document.createRange();r.selectNodeContents($("path"));const s=getSelection();s.removeAllRanges();s.addRange(r);say("حدّد النص الظاهر وانسخه يدويًا.",true)}}
+
+async function send(){
+  const files=st.files.map((f,i)=>new File([f],newName(f,i),{type:f.type||"application/octet-stream"}));
+  if(navigator.canShare&&navigator.canShare({files})){
+    try{await navigator.share({files,title:folder()});addLog();say("تم التسليم. اختر WorkDrive ثم المجلد: "+folder());}
+    catch(e){if(e.name!=="AbortError")say("تعذّر فتح نافذة المشاركة: "+e.message,true)}
+    return;
+  }
+  // بديل: حفظ نسخ بالأسماء الجديدة ثم رفعها من داخل WorkDrive
+  files.forEach((f,i)=>setTimeout(()=>{const a=document.createElement("a");a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove()},i*400));
+  addLog();
+  say("هذا المتصفح لا يدعم إرسال الملفات مباشرة، فحُفظت نسخ بالأسماء الجديدة في التنزيلات. افتح WorkDrive ← + ← رفع ملف واخترها.",true);
+}
+
+$("docDate").value=new Date().toISOString().slice(0,10);
+const sb=store("arch-branch");if(sb){const b=BRANCHES.find(x=>x.k===sb);if(b)st.branch=b}
+chips($("branches"),BRANCHES,b=>b.n,()=>st.branch,b=>{st.branch=b;store("arch-branch",b.k)});
+chips($("types"),TYPES,t=>t,()=>st.type,t=>st.type=t);
+$("fileIn").onchange=e=>{st.files.push(...e.target.files);e.target.value="";render()};
+$("docDate").oninput=render;$("docNote").oninput=render;
+$("copyPath").onclick=()=>copyText(folder());
+$("send").onclick=send;
+$("clear").onclick=()=>{st.files=[];$("docNote").value="";$("msg").hidden=true;render()};
+render();renderLog();
+</script>
+</body>
+</html>
