@@ -26,10 +26,12 @@ for line in src.read_text(encoding="utf-8").splitlines():
         cur = line[3:].strip(); sections.append(cur); continue
     if not line.strip() or line.startswith("#"):
         continue
-    rid, mod, desc, pri, phase = [x.strip() for x in line.split("|")]
+    f = [x.strip() for x in line.split("|")]
+    rid, mod, desc, pri, phase = f[:5]
+    status = f[5] if len(f) > 5 and f[5] else "موثّق – لم يبدأ التنفيذ"
+    path = f[6] if len(f) > 6 and f[6] else PATHS[mod]
     rows.append(dict(id=rid, section=cur, module=mod, desc=desc, pri=pri, phase=int(phase),
-                     path=PATHS[mod], test=f"T-{rid}", status="موثّق – لم يبدأ التنفيذ",
-                     accept="معلّق"))
+                     path=path, test=f"T-{rid}", status=status, accept="معلّق"))
 
 ids = [r["id"] for r in rows]
 dups = [i for i, c in collections.Counter(ids).items() if c > 1]
@@ -48,19 +50,20 @@ by_pri = collections.Counter(r["pri"] for r in rows)
 out = ["# MASTER_REQUIREMENTS — سجل المتطلبات الرئيسي لمنظومة «لقمة وقيمة»", "",
        "> **مولَّد آلياً** من `docs/_source/requirements.psv` عبر `scripts/gen_traceability.py`. "
        "لا يُعدَّل هذا الملف يدوياً؛ يُعدَّل المصدر ثم يُعاد التوليد.", "",
-       "**الإصدار:** 0.1 (المرحلة 1 – مسودة للاعتماد) · **التاريخ:** 2026-11-20", "",
+       "**الإصدار:** 0.2 (المرحلة 1 – مسودة معدّلة بعد المراجعة) · **التاريخ:** 2026-11-19", "",
        "## القواعد", "",
        "- كل متطلب له رقم مرجعي ثابت لا يُعاد استخدامه، ومقابله اختبار `T-<الرقم>`.",
        "- **لا يُحذف أي متطلب.** الأولوية تحدد ترتيب التنفيذ فقط، لا الإسقاط.",
        "- الأولويات: " + " · ".join(f"**{k}** {v}" for k, v in PRI.items()) + ".",
        "- لا تتغير «الحالة» إلى «منفّذ» إلا بوجود ملف تنفيذ فعلي، ولا «نتيجة القبول» إلى «مقبول» إلا بدليل اختبار موثق في TEST_PLAN.",
+       "- الحالات: «موثّق – لم يبدأ التنفيذ» · «منفّذ – بانتظار القبول» · «قاعدة سارية – تُطبَّق في كل مرحلة» (تُعد مستوفاة لبوابة أي مرحلة ما لم تُسجَّل مخالفة لها) · «منفّذ» · «مقبول».",
        "- مسارات «ملف التنفيذ» حالياً **مخططة** وفق المعمارية المقترحة، وتُحدَّث عند التنفيذ.", "",
        "## الإحصاء", "",
        f"- إجمالي المتطلبات: **{len(rows)}**",
        "- حسب الأولوية: " + " · ".join(f"{k}: {by_pri[k]}" for k in sorted(by_pri)),
        "- حسب المرحلة: " + " · ".join(f"م{k}: {by_phase[k]}" for k in sorted(by_phase)), "",
        "## مصفوفة التتبع", "",
-       "الأعمدة: رقم المتطلب | الوصف | الأولوية | المرحلة | الحالة | ملف التنفيذ | الاختبار | القبول. "
+       "الأعمدة: رقم المتطلب | الوصف | الوحدة (عنوان القسم) | الأولوية | المرحلة | الحالة | ملف التنفيذ | الاختبار | القبول. "
        "النسخة القابلة للفرز في Excel: `TRACEABILITY_MATRIX.csv`.", ""]
 for s in sections:
     out += [f"### {s}", "", "| الرقم | المتطلب | أولوية | مرحلة | الحالة | ملف التنفيذ | الاختبار | القبول |",

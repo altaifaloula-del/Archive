@@ -9,6 +9,7 @@
 | EXECUTION_PLAN.md | 1 | ✅ مسودة للاعتماد |
 | ACCEPTANCE_CRITERIA.md | 1 | ✅ مسودة للاعتماد |
 | OPEN_ISSUES.md | 1 (تُحدّث دائماً) | ✅ |
+| PHASE1_REVIEW.md | 1 | ✅ المراجعة النقدية، وطُبّقت ملاحظاتها |
 | COMPLIANCE_REGISTER.md | 1 | ✅ |
 | PROJECT_STATUS.md / CHANGELOG.md | كل جلسة | ✅ |
 | BRAND_GUIDELINES.md | 2 | لم تبدأ |
