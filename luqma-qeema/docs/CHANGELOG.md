@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [0.8.1] — 2026-11-20 — ترتيبات الشعار
+### أُضيف
+- `logo-vertical*` و`logo-horizontal*` و`logo-horizontal-tagline*` (12 ملفاً). BRD-07 وBRD-21 صارا «منفّذ – بانتظار القبول». OI-34 محسوم.
+
 ## [0.8.0] — 2026-11-20 — نظام التصميم
 ### أُضيف
 - `packages/design-tokens/`، و`brand/fonts/`، و`brand/BRAND_GUIDELINES.md` و`DESIGN_SYSTEM.md` و`DIGITAL_APPLICATIONS.md` و`PRINT_SPECIFICATIONS.md`، و`brand/applications/mockups/`.

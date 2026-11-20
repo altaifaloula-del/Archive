@@ -9,8 +9,9 @@
 | master-logo/logo-master.svg | متجهي من الأصل (`source/VECTORIZATION.md`) | ✅ 2026-11-20 |
 | master-logo/logo-master.pdf | تصدير متجهي من SVG | ✅ 2026-11-20 |
 | master-logo/logo-master.png | تصدير شفاف 2640 px من SVG؛ والأصل النقطي في `source/logo-owner-original-v2.png` | ✅ 2026-11-20 |
-| logo-variants/logo-horizontal.svg | = الرئيسي (التخطيط الأفقي للشعار) | ✅ |
-| logo-variants/logo-vertical.svg | يتطلب إعادة ترتيب العناصر، ولم يُعتمد | ⛔ غير منشأ (OI-34) |
+| logo-variants/logo-horizontal*.svg | الرمز بجانب الاسم (+ أبيض، أسود، أحادي) | ✅ 2026-11-20 |
+| logo-variants/logo-vertical*.svg | «لقمة» فوق «وقيمة» (+ أبيض، أسود، أحادي) | ✅ 2026-11-20 |
+| logo-variants/logo-horizontal-tagline*.svg | أفقي مع الشعار التسويقي (+ أبيض، أسود، أحادي) | ✅ 2026-11-20 |
 | logo-variants/logo-symbol.svg (+ white/black/mono-emerald) | القبعة وغطاء الطبق من الأصل (OI-29-ب) | ✅ |
 | logo-variants/logo-white.svg | أحادي أبيض للخلفيات الداكنة | ✅ |
 | logo-variants/logo-black.svg · logo-mono-emerald.svg | أحادي أسود، وأحادي أخضر | ✅ |
