@@ -19,6 +19,7 @@
 | applications/reference/brand-board-owner.png | لوحة تطبيقات من المالك (مرجع أسلوب). SHA-256 `41ff32c7…0da` | ✅ مستلم 2026-11-20 |
 | colors/color-specifications.pdf | مستخرج من الأصل، بعد اعتماد المالك | ينتظر الأصل |
 | fonts/ | خط الشعار من المالك؛ خط الواجهة يُقترح للاعتماد | ينتظر الأصل |
-| LOGO_GEOMETRY.md | يُعد من الأصل | ينتظر الأصل |
+| LOGO_GEOMETRY.md | من الأصل PNG | ✅ مؤقت 0.1 (يُعاد من المتجهي) |
+| geometry/logo-geometry-grid.png · logo-safe-area.png · logo-min-size-test.png | رسوم التوثيق | ✅ |
 | BRAND_GUIDELINES.md · DESIGN_SYSTEM.md · DIGITAL_APPLICATIONS.md · PRINT_SPECIFICATIONS.md | تُعد بعد اعتماد الألوان والخطوط | لم تبدأ |
 | BRAND_ASSET_REGISTER.md · BRAND_CHANGE_CONTROL.md | — | ✅ موجود |
