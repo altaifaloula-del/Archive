@@ -12,7 +12,8 @@
 | PHASE1_REVIEW.md | 1 | ✅ المراجعة النقدية، وطُبّقت ملاحظاتها |
 | COMPLIANCE_REGISTER.md | 1 | ✅ |
 | PROJECT_STATUS.md / CHANGELOG.md | كل جلسة | ✅ |
-| BRAND_GUIDELINES.md | 2 | لم تبدأ |
+| `_source/BRAND_DIRECTIVE.md` | المرجع الأعلى للهوية | ✅ نص المالك محفوظ حرفياً |
+| BRAND_GUIDELINES.md (في `brand/`) | 2 | لم تبدأ — تنتظر OI-28 |
 | DESIGN_SYSTEM.md | 2 | لم تبدأ |
 | UX_UI_SPECIFICATION.md | 2 | لم تبدأ |
 | SYSTEM_ARCHITECTURE.md | 3 | لم تبدأ |

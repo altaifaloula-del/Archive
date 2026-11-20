@@ -5,7 +5,7 @@ root = pathlib.Path(sys.argv[1])
 src = root / "docs/_source/requirements.psv"
 
 PATHS = {
-    "gov": "docs/", "prj": "docs/MASTER_REQUIREMENTS.md", "brand": "design/brand/",
+    "gov": "docs/", "prj": "docs/MASTER_REQUIREMENTS.md", "brand": "brand/",
     "ux": "packages/ui/", "ds": "packages/design-tokens/", "arch": "infra/ + apps/",
     "settings": "apps/api/src/modules/settings/", "db": "apps/api/prisma/",
     "dash": "apps/admin/src/app/dashboard/", "products": "apps/api/src/modules/catalog/",
