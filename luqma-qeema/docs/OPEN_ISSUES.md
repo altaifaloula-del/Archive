@@ -55,4 +55,5 @@
 | OI-22 · OI-28 · OI-29 | اعتماد الألوان؛ إعادة البناء المتجهي بإذن خطي؛ فصل الخلفية ونسخة الاسم ونسخة الرمز؛ وفصل كلمتي الاسم | 2026-11-20 | `brand/master-logo/source/VECTORIZATION.md` و`brand/colors/color-palette.json` |
 | أسلوب الواجهات والخط | اعتماد النماذج الثمانية أسلوباً، وخط **IBM Plex Sans Arabic** (وIBM Plex Sans للإنجليزية) بالأوزان 400 و500 و700 | 2026-11-20 | `brand/DESIGN_SYSTEM.md` و`packages/design-tokens/` |
 | OI-34 | اعتماد الرأسي (ب) والأفقي (ج) والأفقي مع الشعار التسويقي (د) بتفويض المالك | 2026-11-20 | `brand/logo-variants/`، و`brand/LOGO_GEOMETRY.md` §8 |
+| OI-35 | اعتماد القرارات المعمارية ADR-01..07 (Prisma، pnpm+Turborepo، BullMQ، Outbox، PWA لنقاط البيع، استضافة داخل المملكة، مزود الخرائط) | ARC-12: لا بديل تقني دون موافقة | التفاصيل في `SYSTEM_ARCHITECTURE.md` §9 | 3 | المالك |
 | اعتماد المرحلة 2 | اعتمد المالك المرحلة 2 بالاستثناءات الثلاثة | 2026-11-20 | `docs/PHASE2_REVIEW.md`؛ 38 متطلباً «مقبول» وقاعدة سارية واحدة |
