@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [1.2.0] — 2026-11-20 — مخطط قاعدة البيانات
+### أُضيف
+- `apps/api/prisma/schema.prisma` (78 جدولاً)، والترحيلات 0001 و0002، و`tests/db/` (16 اختباراً)، و`docs/DATABASE_SCHEMA.md`.
+
 ## [1.1.0] — 2026-11-20 — بدء المرحلة 3 (وثائق)
 ### أُضيف
 - `docs/SYSTEM_ARCHITECTURE.md` 0.1، وOI-35.

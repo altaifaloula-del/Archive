@@ -1,0 +1,1095 @@
+// مخطط قاعدة بيانات «لقمة وقيمة» — الإصدار 0.1 (مسودة المرحلة 3)
+// المرجع: docs/DATABASE_SCHEMA.md و docs/SYSTEM_ARCHITECTURE.md §4
+// قيود السلامة المالية التي لا يعبّر عنها Prisma موجودة في prisma/sql/ وتُطبَّق مع الترحيلات.
+// المبالغ: Decimal(14,2)؛ التكاليف والكميات: Decimal(14,4)؛ الأوقات: timestamptz.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────── التعدادات ─────────────
+
+enum ItemType {
+  RAW            // مادة خام
+  SEMI_FINISHED  // نصف مصنّع
+  MEAL           // وجبة للبيع
+  RETAIL         // صنف تجزئة (للتوسع)
+}
+
+enum OrderStatus {
+  RECEIVED
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  PREPARING
+  READY
+  COURIER_ASSIGNED
+  PICKED_UP
+  ON_THE_WAY
+  DELIVERED
+  DELIVERY_FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum OrderType {
+  DELIVERY
+  PICKUP
+  TAKEAWAY
+  DINE_IN
+}
+
+enum Channel {
+  APP
+  POS
+  WEB
+  AGGREGATOR
+}
+
+enum StockMovementType {
+  PURCHASE_RECEIPT
+  SALE_CONSUMPTION
+  PRODUCTION_IN
+  PRODUCTION_OUT
+  WASTE
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+  RETURN_TO_SUPPLIER
+  CUSTOMER_RETURN
+}
+
+enum DocumentStatus {
+  DRAFT
+  APPROVED
+  POSTED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  MADA
+  CARD
+  APPLE_PAY
+  STC_PAY
+  CASH_ON_DELIVERY
+  LOYALTY_POINTS
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum InvoiceKind {
+  SIMPLIFIED_TAX_INVOICE
+  TAX_INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+}
+
+// ───────────── الشركة والإعدادات (SET-01، PRJ-04) ─────────────
+
+model Company {
+  id            String   @id @default(uuid()) @db.Uuid
+  legalNameAr   String
+  legalNameEn   String?
+  crNumber      String?  // السجل التجاري (OI-02)
+  vatNumber     String?  @unique // الرقم الضريبي (OI-02)
+  nationalAddr  String?
+  currency      String   @default("SAR") @db.Char(3)
+  createdAt     DateTime @default(now()) @db.Timestamptz
+  updatedAt     DateTime @updatedAt @db.Timestamptz
+  branches      Branch[]
+  @@map("companies")
+}
+
+model Branch {
+  id            String   @id @default(uuid()) @db.Uuid
+  companyId     String   @db.Uuid
+  code          String   @unique
+  nameAr        String
+  nameEn        String?
+  address       String?
+  latitude      Decimal? @db.Decimal(9, 6)
+  longitude     Decimal? @db.Decimal(9, 6)
+  isActive      Boolean  @default(true)
+  acceptingOrders Boolean @default(true)       // OPS-03
+  pausedUntil   DateTime? @db.Timestamptz
+  pauseReason   String?
+  maxOpenOrders Int?                            // الطاقة الاستيعابية OPS-03
+  createdAt     DateTime @default(now()) @db.Timestamptz
+  updatedAt     DateTime @updatedAt @db.Timestamptz
+  company       Company  @relation(fields: [companyId], references: [id])
+  warehouses    Warehouse[]
+  hours         BranchHours[]
+  zones         DeliveryZone[]
+  @@map("branches")
+}
+
+model BranchHours {
+  id        String  @id @default(uuid()) @db.Uuid
+  branchId  String  @db.Uuid
+  channel   Channel?
+  weekday   Int     // 0 = الأحد
+  opensAt   String  // "10:00" بتوقيت الرياض
+  closesAt  String
+  branch    Branch  @relation(fields: [branchId], references: [id])
+  @@unique([branchId, channel, weekday, opensAt])
+  @@map("branch_hours")
+}
+
+model Warehouse {
+  id        String  @id @default(uuid()) @db.Uuid
+  branchId  String  @db.Uuid
+  code      String  @unique
+  nameAr    String
+  isActive  Boolean @default(true)
+  branch    Branch  @relation(fields: [branchId], references: [id])
+  @@map("warehouses")
+}
+
+model TaxRate {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique // VAT15, ZERO, EXEMPT
+  nameAr    String
+  rate      Decimal  @db.Decimal(5, 4)
+  validFrom DateTime @db.Timestamptz
+  validTo   DateTime? @db.Timestamptz
+  @@map("tax_rates")
+}
+
+model DocumentSequence {
+  id        String @id @default(uuid()) @db.Uuid
+  docType   String // INVOICE, ORDER, PO, JE ...
+  branchId  String @db.Uuid
+  year      Int
+  prefix    String
+  nextValue BigInt @default(1)
+  @@unique([docType, branchId, year])
+  @@map("document_sequences")
+}
+
+// ───────────── الهوية والصلاحيات (SEC-01..09) ─────────────
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  phone        String    @unique
+  email        String?   @unique
+  fullName     String
+  passwordHash String?
+  mfaSecret    String?   // مشفّر على مستوى التطبيق
+  mfaEnabled   Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime? @db.Timestamptz
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @db.Timestamptz
+  deletedAt    DateTime? @db.Timestamptz
+  roles        UserRole[]
+  sessions     Session[]
+  @@map("users")
+}
+
+model Role {
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique
+  nameAr      String
+  permissions RolePermission[]
+  users       UserRole[]
+  @@map("roles")
+}
+
+model Permission {
+  id     String @id @default(uuid()) @db.Uuid
+  code   String @unique // menu.view, price.edit, order.refund ...
+  nameAr String
+  roles  RolePermission[]
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId   String  @db.Uuid
+  roleId   String  @db.Uuid
+  branchId String? @db.Uuid // null = كل الفروع
+  user     User    @relation(fields: [userId], references: [id])
+  role     Role    @relation(fields: [roleId], references: [id])
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  tokenHash  String   @unique
+  device     String?
+  expiresAt  DateTime @db.Timestamptz
+  revokedAt  DateTime? @db.Timestamptz
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  user       User     @relation(fields: [userId], references: [id])
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ───────────── الأصناف والوحدات (PRD، MNU-01) ─────────────
+
+model Unit {
+  id     String @id @default(uuid()) @db.Uuid
+  code   String @unique // g, kg, ml, l, pc, box
+  nameAr String
+  @@map("units")
+}
+
+model Item {
+  id            String    @id @default(uuid()) @db.Uuid
+  sku           String    @unique
+  type          ItemType
+  nameAr        String
+  nameEn        String?
+  baseUnitId    String    @db.Uuid
+  taxRateId     String?   @db.Uuid
+  categoryId    String?   @db.Uuid
+  trackLots     Boolean   @default(false) // PRD-10
+  reorderLevel  Decimal?  @db.Decimal(14, 4)
+  standardCost  Decimal?  @db.Decimal(14, 4)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @db.Timestamptz
+  deletedAt     DateTime? @db.Timestamptz
+  barcodes      ItemBarcode[]
+  conversions   UnitConversion[]
+  @@index([type, isActive])
+  @@map("items")
+}
+
+model UnitConversion {
+  id       String  @id @default(uuid()) @db.Uuid
+  itemId   String  @db.Uuid
+  unitId   String  @db.Uuid
+  factor   Decimal @db.Decimal(14, 6) // كم وحدة أساسية في هذه الوحدة
+  purpose  String  // PURCHASE | ISSUE | SALE
+  item     Item    @relation(fields: [itemId], references: [id])
+  @@unique([itemId, unitId, purpose])
+  @@map("unit_conversions")
+}
+
+model ItemBarcode {
+  id      String @id @default(uuid()) @db.Uuid
+  itemId  String @db.Uuid
+  barcode String @unique
+  item    Item   @relation(fields: [itemId], references: [id])
+  @@map("item_barcodes")
+}
+
+model ItemCategory {
+  id       String  @id @default(uuid()) @db.Uuid
+  parentId String? @db.Uuid
+  nameAr   String
+  @@map("item_categories")
+}
+
+// ───────────── القائمة (MNU-02..06) ─────────────
+
+model MenuCategory {
+  id        String  @id @default(uuid()) @db.Uuid
+  nameAr    String
+  nameEn    String?
+  imageKey  String?
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+  items     MenuItem[]
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id             String    @id @default(uuid()) @db.Uuid
+  itemId         String    @unique @db.Uuid // الصنف من نوع MEAL
+  categoryId     String    @db.Uuid
+  descriptionAr  String?
+  descriptionEn  String?
+  imageKey       String?
+  calories       Int?
+  prepMinutes    Int?
+  isAvailable    Boolean   @default(true)
+  unavailableReason String?
+  sortOrder      Int       @default(0)
+  category       MenuCategory @relation(fields: [categoryId], references: [id])
+  sizes          MenuItemSize[]
+  modifierGroups MenuItemModifierGroup[]
+  allergens      MenuItemAllergen[]
+  @@index([categoryId, isAvailable])
+  @@map("menu_items")
+}
+
+model MenuItemSize {
+  id         String   @id @default(uuid()) @db.Uuid
+  menuItemId String   @db.Uuid
+  nameAr     String
+  isDefault  Boolean  @default(false)
+  recipeId   String?  @db.Uuid
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  @@map("menu_item_sizes")
+}
+
+model ModifierGroup {
+  id        String  @id @default(uuid()) @db.Uuid
+  nameAr    String
+  minSelect Int     @default(0)
+  maxSelect Int     @default(1)
+  modifiers Modifier[]
+  menuItems MenuItemModifierGroup[]
+  @@map("modifier_groups")
+}
+
+model Modifier {
+  id          String   @id @default(uuid()) @db.Uuid
+  groupId     String   @db.Uuid
+  nameAr      String
+  isRemoval   Boolean  @default(false) // «بدون»
+  itemId      String?  @db.Uuid        // المكوّن المضاف أو المحذوف
+  quantity    Decimal? @db.Decimal(14, 4)
+  isAvailable Boolean  @default(true)
+  group       ModifierGroup @relation(fields: [groupId], references: [id])
+  @@map("modifiers")
+}
+
+model MenuItemModifierGroup {
+  menuItemId String @db.Uuid
+  groupId    String @db.Uuid
+  sortOrder  Int    @default(0)
+  menuItem   MenuItem      @relation(fields: [menuItemId], references: [id])
+  group      ModifierGroup @relation(fields: [groupId], references: [id])
+  @@id([menuItemId, groupId])
+  @@map("menu_item_modifier_groups")
+}
+
+model Allergen {
+  id        String @id @default(uuid()) @db.Uuid
+  code      String @unique
+  nameAr    String
+  menuItems MenuItemAllergen[]
+  @@map("allergens")
+}
+
+model MenuItemAllergen {
+  menuItemId String   @db.Uuid
+  allergenId String   @db.Uuid
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  allergen   Allergen @relation(fields: [allergenId], references: [id])
+  @@id([menuItemId, allergenId])
+  @@map("menu_item_allergens")
+}
+
+// ───────────── الوصفات والإنتاج والهدر (RCP-01..05) ─────────────
+
+model Recipe {
+  id           String    @id @default(uuid()) @db.Uuid
+  outputItemId String    @db.Uuid
+  version      Int       @default(1)
+  yieldQty     Decimal   @db.Decimal(14, 4)
+  approvedById String?   @db.Uuid
+  approvedAt   DateTime? @db.Timestamptz
+  isActive     Boolean   @default(true)
+  lines        RecipeLine[]
+  @@unique([outputItemId, version])
+  @@map("recipes")
+}
+
+model RecipeLine {
+  id         String  @id @default(uuid()) @db.Uuid
+  recipeId   String  @db.Uuid
+  itemId     String  @db.Uuid
+  quantity   Decimal @db.Decimal(14, 4) // بالوحدة الأساسية
+  wastePct   Decimal @default(0) @db.Decimal(5, 2)
+  recipe     Recipe  @relation(fields: [recipeId], references: [id])
+  @@map("recipe_lines")
+}
+
+model ProductionBatch {
+  id          String   @id @default(uuid()) @db.Uuid
+  number      String   @unique
+  warehouseId String   @db.Uuid
+  recipeId    String   @db.Uuid
+  quantity    Decimal  @db.Decimal(14, 4)
+  expiresAt   DateTime? @db.Timestamptz
+  producedAt  DateTime @default(now()) @db.Timestamptz
+  producedById String  @db.Uuid
+  @@map("production_batches")
+}
+
+model WasteRecord {
+  id          String   @id @default(uuid()) @db.Uuid
+  number      String   @unique
+  warehouseId String   @db.Uuid
+  itemId      String   @db.Uuid
+  quantity    Decimal  @db.Decimal(14, 4)
+  reason      String
+  unitCost    Decimal  @db.Decimal(14, 4)
+  recordedById String  @db.Uuid
+  approvedById String? @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  @@map("waste_records")
+}
+
+// ───────────── الأسعار والعروض (PRC، ACC-24) ─────────────
+
+model PriceList {
+  id        String    @id @default(uuid()) @db.Uuid
+  nameAr    String
+  branchId  String?   @db.Uuid
+  channel   Channel?
+  validFrom DateTime  @db.Timestamptz
+  validTo   DateTime? @db.Timestamptz
+  pricesIncludeVat Boolean @default(true) // OI-23
+  items     PriceListItem[]
+  @@map("price_lists")
+}
+
+model PriceListItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  priceListId String  @db.Uuid
+  menuItemSizeId String? @db.Uuid
+  modifierId  String? @db.Uuid
+  price       Decimal @db.Decimal(14, 2)
+  priceList   PriceList @relation(fields: [priceListId], references: [id])
+  @@unique([priceListId, menuItemSizeId, modifierId])
+  @@map("price_list_items")
+}
+
+model Promotion {
+  id        String   @id @default(uuid()) @db.Uuid
+  nameAr    String
+  kind      String   // PERCENT | FIXED | BUY_X_GET_Y | BUNDLE
+  value     Decimal? @db.Decimal(14, 2)
+  rules     Json
+  validFrom DateTime @db.Timestamptz
+  validTo   DateTime @db.Timestamptz
+  isActive  Boolean  @default(true)
+  @@map("promotions")
+}
+
+model Coupon {
+  id            String   @id @default(uuid()) @db.Uuid
+  code          String   @unique
+  promotionId   String   @db.Uuid
+  maxRedemptions Int?
+  perCustomerLimit Int?  @default(1)
+  validFrom     DateTime @db.Timestamptz
+  validTo       DateTime @db.Timestamptz
+  redemptions   CouponRedemption[]
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id         String   @id @default(uuid()) @db.Uuid
+  couponId   String   @db.Uuid
+  orderId    String   @unique @db.Uuid
+  customerId String   @db.Uuid
+  amount     Decimal  @db.Decimal(14, 2)
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  coupon     Coupon   @relation(fields: [couponId], references: [id])
+  @@map("coupon_redemptions")
+}
+
+// ───────────── المخزون (INV) ─────────────
+
+model StockLot {
+  id          String    @id @default(uuid()) @db.Uuid
+  itemId      String    @db.Uuid
+  warehouseId String    @db.Uuid
+  lotNumber   String
+  expiresAt   DateTime? @db.Timestamptz
+  unitCost    Decimal   @db.Decimal(14, 4)
+  receivedAt  DateTime  @default(now()) @db.Timestamptz
+  @@unique([itemId, warehouseId, lotNumber])
+  @@index([itemId, warehouseId, expiresAt])
+  @@map("stock_lots")
+}
+
+// الرصيد يتغير فقط بحركة (INV-03)؛ التحديث داخل معاملة الحركة نفسها
+model StockBalance {
+  itemId      String  @db.Uuid
+  warehouseId String  @db.Uuid
+  onHand      Decimal @default(0) @db.Decimal(14, 4)
+  reserved    Decimal @default(0) @db.Decimal(14, 4)
+  damaged     Decimal @default(0) @db.Decimal(14, 4)
+  inTransit   Decimal @default(0) @db.Decimal(14, 4)
+  avgCost     Decimal @default(0) @db.Decimal(14, 4) // OI-08
+  @@id([itemId, warehouseId])
+  @@map("stock_balances")
+}
+
+model StockMovement {
+  id          String            @id @default(uuid()) @db.Uuid
+  itemId      String            @db.Uuid
+  warehouseId String            @db.Uuid
+  lotId       String?           @db.Uuid
+  type        StockMovementType
+  quantity    Decimal           @db.Decimal(14, 4) // موجب للدخول، سالب للخروج
+  unitCost    Decimal           @db.Decimal(14, 4)
+  sourceType  String            // ORDER, GRN, WASTE, COUNT ...
+  sourceId    String            @db.Uuid
+  createdById String?           @db.Uuid
+  createdAt   DateTime          @default(now()) @db.Timestamptz
+  @@index([itemId, warehouseId, createdAt])
+  @@index([sourceType, sourceId])
+  @@map("stock_movements")
+}
+
+model StockReservation {
+  id          String    @id @default(uuid()) @db.Uuid
+  orderId     String    @db.Uuid
+  itemId      String    @db.Uuid
+  warehouseId String    @db.Uuid
+  quantity    Decimal   @db.Decimal(14, 4)
+  expiresAt   DateTime  @db.Timestamptz // OI-09
+  releasedAt  DateTime? @db.Timestamptz
+  consumedAt  DateTime? @db.Timestamptz
+  @@index([orderId])
+  @@index([expiresAt])
+  @@map("stock_reservations")
+}
+
+model StockCount {
+  id          String         @id @default(uuid()) @db.Uuid
+  number      String         @unique
+  warehouseId String         @db.Uuid
+  kind        String         // PERIODIC | SURPRISE
+  status      DocumentStatus @default(DRAFT)
+  countedAt   DateTime       @db.Timestamptz
+  approvedById String?       @db.Uuid
+  lines       StockCountLine[]
+  @@map("stock_counts")
+}
+
+model StockCountLine {
+  id          String  @id @default(uuid()) @db.Uuid
+  countId     String  @db.Uuid
+  itemId      String  @db.Uuid
+  systemQty   Decimal @db.Decimal(14, 4)
+  countedQty  Decimal @db.Decimal(14, 4)
+  count       StockCount @relation(fields: [countId], references: [id])
+  @@map("stock_count_lines")
+}
+
+// ───────────── المشتريات (PUR) ─────────────
+
+model Supplier {
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique
+  nameAr      String
+  vatNumber   String?
+  phone       String?
+  paymentTermsDays Int @default(0)
+  accountId   String? @db.Uuid
+  isActive    Boolean @default(true)
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id          String         @id @default(uuid()) @db.Uuid
+  number      String         @unique
+  supplierId  String         @db.Uuid
+  warehouseId String         @db.Uuid
+  status      DocumentStatus @default(DRAFT)
+  orderedAt   DateTime       @db.Timestamptz
+  approvedById String?       @db.Uuid
+  lines       PurchaseOrderLine[]
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id        String  @id @default(uuid()) @db.Uuid
+  poId      String  @db.Uuid
+  itemId    String  @db.Uuid
+  unitId    String  @db.Uuid
+  quantity  Decimal @db.Decimal(14, 4)
+  unitPrice Decimal @db.Decimal(14, 4)
+  po        PurchaseOrder @relation(fields: [poId], references: [id])
+  @@map("purchase_order_lines")
+}
+
+model GoodsReceipt {
+  id          String         @id @default(uuid()) @db.Uuid
+  number      String         @unique
+  poId        String?        @db.Uuid
+  warehouseId String         @db.Uuid
+  status      DocumentStatus @default(DRAFT)
+  receivedAt  DateTime       @db.Timestamptz
+  lines       GoodsReceiptLine[]
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptLine {
+  id        String    @id @default(uuid()) @db.Uuid
+  grnId     String    @db.Uuid
+  itemId    String    @db.Uuid
+  quantity  Decimal   @db.Decimal(14, 4)
+  unitCost  Decimal   @db.Decimal(14, 4)
+  lotNumber String?
+  expiresAt DateTime? @db.Timestamptz
+  grn       GoodsReceipt @relation(fields: [grnId], references: [id])
+  @@map("goods_receipt_lines")
+}
+
+model SupplierInvoice {
+  id          String         @id @default(uuid()) @db.Uuid
+  number      String         @unique
+  supplierRef String
+  supplierId  String         @db.Uuid
+  grnId       String?        @db.Uuid
+  status      DocumentStatus @default(DRAFT)
+  subtotal    Decimal        @db.Decimal(14, 2)
+  vatAmount   Decimal        @db.Decimal(14, 2)
+  total       Decimal        @db.Decimal(14, 2)
+  dueAt       DateTime?      @db.Timestamptz
+  issuedAt    DateTime       @db.Timestamptz
+  @@unique([supplierId, supplierRef])
+  @@map("supplier_invoices")
+}
+
+// ───────────── العملاء والولاء (CRM-01، LOY-01) ─────────────
+
+model Customer {
+  id         String    @id @default(uuid()) @db.Uuid
+  phone      String    @unique
+  fullName   String?
+  email      String?
+  marketingConsent Boolean @default(false) // C-10
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  deletedAt  DateTime? @db.Timestamptz      // حذف الحساب (C-05)
+  addresses  CustomerAddress[]
+  @@map("customers")
+}
+
+model CustomerAddress {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @db.Uuid
+  label      String
+  details    String
+  latitude   Decimal  @db.Decimal(9, 6)
+  longitude  Decimal  @db.Decimal(9, 6)
+  notes      String?
+  isDefault  Boolean  @default(false)
+  customer   Customer @relation(fields: [customerId], references: [id])
+  @@map("customer_addresses")
+}
+
+model Complaint {
+  id         String   @id @default(uuid()) @db.Uuid
+  number     String   @unique
+  customerId String   @db.Uuid
+  orderId    String?  @db.Uuid
+  subject    String
+  body       String
+  status     String   @default("OPEN")
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  @@map("complaints")
+}
+
+model LoyaltyTransaction {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @db.Uuid
+  orderId    String?  @db.Uuid
+  points     Int      // موجب للكسب، سالب للاستبدال والانتهاء
+  kind       String   // EARN | REDEEM | EXPIRE | ADJUST
+  expiresAt  DateTime? @db.Timestamptz
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  @@index([customerId, createdAt])
+  @@map("loyalty_transactions")
+}
+
+// ───────────── الطلبات (ORD، OPS-05) ─────────────
+
+model Order {
+  id             String      @id @default(uuid()) @db.Uuid
+  number         String      @unique
+  branchId       String      @db.Uuid
+  customerId     String?     @db.Uuid
+  channel        Channel
+  type           OrderType
+  status         OrderStatus @default(RECEIVED)
+  addressId      String?     @db.Uuid
+  scheduledFor   DateTime?   @db.Timestamptz
+  notes          String?
+  // المبالغ منفصلة (ORD-12)؛ يحسبها الخادم فقط (APP-18)
+  itemsSubtotal  Decimal     @db.Decimal(14, 2)
+  discountTotal  Decimal     @default(0) @db.Decimal(14, 2)
+  deliveryFee    Decimal     @default(0) @db.Decimal(14, 2)
+  vatTotal       Decimal     @db.Decimal(14, 2)
+  grandTotal     Decimal     @db.Decimal(14, 2)
+  idempotencyKey String      @unique // POS-13، AC-03
+  posShiftId     String?     @db.Uuid
+  createdAt      DateTime    @default(now()) @db.Timestamptz
+  updatedAt      DateTime    @updatedAt @db.Timestamptz
+  lines          OrderLine[]
+  history        OrderStatusHistory[]
+  @@index([branchId, status, createdAt])
+  @@index([customerId, createdAt])
+  @@map("orders")
+}
+
+model OrderLine {
+  id             String  @id @default(uuid()) @db.Uuid
+  orderId        String  @db.Uuid
+  menuItemSizeId String  @db.Uuid
+  nameAr         String  // لقطة الاسم وقت الطلب
+  quantity       Int
+  unitPrice      Decimal @db.Decimal(14, 2)
+  discount       Decimal @default(0) @db.Decimal(14, 2)
+  vatRate        Decimal @db.Decimal(5, 4)
+  vatAmount      Decimal @db.Decimal(14, 2)
+  lineTotal      Decimal @db.Decimal(14, 2)
+  notes          String?
+  order          Order   @relation(fields: [orderId], references: [id])
+  modifiers      OrderLineModifier[]
+  @@map("order_lines")
+}
+
+model OrderLineModifier {
+  id          String  @id @default(uuid()) @db.Uuid
+  orderLineId String  @db.Uuid
+  modifierId  String  @db.Uuid
+  nameAr      String
+  price       Decimal @db.Decimal(14, 2)
+  orderLine   OrderLine @relation(fields: [orderLineId], references: [id])
+  @@map("order_line_modifiers")
+}
+
+model OrderStatusHistory {
+  id         String      @id @default(uuid()) @db.Uuid
+  orderId    String      @db.Uuid
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  reason     String?
+  actorId    String?     @db.Uuid // ORD-02
+  createdAt  DateTime    @default(now()) @db.Timestamptz
+  order      Order       @relation(fields: [orderId], references: [id])
+  @@index([orderId, createdAt])
+  @@map("order_status_history")
+}
+
+model OrderRating {
+  id         String   @id @default(uuid()) @db.Uuid
+  orderId    String   @unique @db.Uuid
+  stars      Int
+  comment    String?
+  itemStars  Json?
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  @@map("order_ratings")
+}
+
+// ───────────── المطبخ (KIT) ─────────────
+
+model KitchenStation {
+  id       String @id @default(uuid()) @db.Uuid
+  branchId String @db.Uuid
+  nameAr   String
+  @@map("kitchen_stations")
+}
+
+model KitchenTicket {
+  id          String    @id @default(uuid()) @db.Uuid
+  orderId     String    @db.Uuid
+  stationId   String?   @db.Uuid
+  status      String    @default("QUEUED") // QUEUED | PREPARING | READY
+  targetMinutes Int?
+  startedAt   DateTime? @db.Timestamptz
+  readyAt     DateTime? @db.Timestamptz
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  @@index([stationId, status, createdAt])
+  @@map("kitchen_tickets")
+}
+
+// ───────────── التوصيل (ORD-04..09، OPS-04، DRV) ─────────────
+
+model DeliveryZone {
+  id          String  @id @default(uuid()) @db.Uuid
+  branchId    String  @db.Uuid
+  nameAr      String
+  polygon     Json    // GeoJSON
+  fee         Decimal @db.Decimal(14, 2)
+  minOrder    Decimal @default(0) @db.Decimal(14, 2)
+  isActive    Boolean @default(true)
+  branch      Branch  @relation(fields: [branchId], references: [id])
+  @@map("delivery_zones")
+}
+
+model Courier {
+  id         String  @id @default(uuid()) @db.Uuid
+  userId     String? @unique @db.Uuid
+  providerId String? @db.Uuid // مندوب منصة خارجية
+  fullName   String
+  phone      String
+  isAvailable Boolean @default(false)
+  @@map("couriers")
+}
+
+model DeliveryProvider {
+  id       String  @id @default(uuid()) @db.Uuid
+  code     String  @unique
+  nameAr   String
+  config   Json?   // بلا أسرار؛ الأسرار في مدير الأسرار
+  isActive Boolean @default(true)
+  @@map("delivery_providers")
+}
+
+model DeliveryAssignment {
+  id          String    @id @default(uuid()) @db.Uuid
+  orderId     String    @db.Uuid
+  courierId   String    @db.Uuid
+  assignedAt  DateTime  @default(now()) @db.Timestamptz
+  acceptedAt  DateTime? @db.Timestamptz
+  pickedUpAt  DateTime? @db.Timestamptz
+  deliveredAt DateTime? @db.Timestamptz
+  failedAt    DateTime? @db.Timestamptz
+  failReason  String?
+  proofType   String?   // PHOTO | CODE
+  proofKey    String?
+  @@index([courierId, assignedAt])
+  @@index([orderId])
+  @@map("delivery_assignments")
+}
+
+// ───────────── نقاط البيع (POS) ─────────────
+
+model PosTerminal {
+  id       String  @id @default(uuid()) @db.Uuid
+  branchId String  @db.Uuid
+  code     String  @unique
+  isActive Boolean @default(true)
+  @@map("pos_terminals")
+}
+
+model PosShift {
+  id            String    @id @default(uuid()) @db.Uuid
+  terminalId    String    @db.Uuid
+  cashierId     String    @db.Uuid
+  openedAt      DateTime  @db.Timestamptz
+  openingCash   Decimal   @db.Decimal(14, 2)
+  closedAt      DateTime? @db.Timestamptz
+  expectedCash  Decimal?  @db.Decimal(14, 2)
+  countedCash   Decimal?  @db.Decimal(14, 2)
+  differenceReason String?
+  approvedById  String?   @db.Uuid
+  @@map("pos_shifts")
+}
+
+model IdempotencyKey {
+  key        String   @id
+  scope      String   // ORDER_CREATE, PAYMENT, POS_SYNC
+  responseRef String?
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  @@map("idempotency_keys")
+}
+
+// ───────────── المدفوعات والفواتير (POS-05، DB-15، CMP-02) ─────────────
+
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  orderId       String        @db.Uuid
+  method        PaymentMethod
+  amount        Decimal       @db.Decimal(14, 2)
+  gatewayRef    String?       @unique
+  status        String        // PENDING | CAPTURED | FAILED
+  createdAt     DateTime      @default(now()) @db.Timestamptz
+  @@index([orderId])
+  @@map("payments")
+}
+
+model Refund {
+  id         String   @id @default(uuid()) @db.Uuid
+  paymentId  String   @db.Uuid
+  amount     Decimal  @db.Decimal(14, 2)
+  reason     String
+  approvedById String @db.Uuid
+  gatewayRef String?  @unique
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  @@map("refunds")
+}
+
+model Invoice {
+  id           String      @id @default(uuid()) @db.Uuid
+  number       String      @unique
+  kind         InvoiceKind
+  branchId     String      @db.Uuid
+  orderId      String?     @db.Uuid
+  originalInvoiceId String? @db.Uuid // للإشعار الدائن
+  issuedAt     DateTime    @db.Timestamptz
+  subtotal     Decimal     @db.Decimal(14, 2)
+  vatTotal     Decimal     @db.Decimal(14, 2)
+  total        Decimal     @db.Decimal(14, 2)
+  // حقول «فاتورة» (DB-15)
+  uuid         String      @unique @db.Uuid
+  icv          BigInt      // عدّاد الفواتير
+  pih          String      // تجزئة الفاتورة السابقة
+  invoiceHash  String
+  qrPayload    String
+  zatcaStatus  String      @default("NOT_SENT")
+  lines        InvoiceLine[]
+  @@unique([branchId, icv])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id        String  @id @default(uuid()) @db.Uuid
+  invoiceId String  @db.Uuid
+  nameAr    String
+  quantity  Decimal @db.Decimal(14, 4)
+  unitPrice Decimal @db.Decimal(14, 2)
+  vatRate   Decimal @db.Decimal(5, 4)
+  vatAmount Decimal @db.Decimal(14, 2)
+  lineTotal Decimal @db.Decimal(14, 2)
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  @@map("invoice_lines")
+}
+
+// ───────────── المحاسبة: نواة الأستاذ العام (ACC، OI-12) ─────────────
+
+model Account {
+  id        String      @id @default(uuid()) @db.Uuid
+  code      String      @unique
+  nameAr    String
+  type      AccountType
+  parentId  String?     @db.Uuid
+  isPosting Boolean     @default(true) // حساب ترحيل أم تجميعي
+  isActive  Boolean     @default(true)
+  lines     JournalLine[]
+  @@map("accounts")
+}
+
+model CostCenter {
+  id     String @id @default(uuid()) @db.Uuid
+  code   String @unique
+  nameAr String
+  @@map("cost_centers")
+}
+
+model FiscalPeriod {
+  id        String    @id @default(uuid()) @db.Uuid
+  year      Int
+  month     Int
+  startsAt  DateTime  @db.Timestamptz
+  endsAt    DateTime  @db.Timestamptz
+  closedAt  DateTime? @db.Timestamptz // ACC-13
+  closedById String?  @db.Uuid
+  @@unique([year, month])
+  @@map("fiscal_periods")
+}
+
+model JournalEntry {
+  id          String         @id @default(uuid()) @db.Uuid
+  number      String         @unique
+  periodId    String         @db.Uuid
+  entryDate   DateTime       @db.Timestamptz
+  description String
+  status      DocumentStatus @default(DRAFT)
+  sourceType  String         // ORDER, INVOICE, GRN, WASTE, MANUAL ...
+  sourceId    String?        @db.Uuid
+  entryKind   String         // SALE, COGS, REVERSAL ...
+  reversesId  String?        @unique @db.Uuid // ACC-17
+  postedAt    DateTime?      @db.Timestamptz
+  postedById  String?        @db.Uuid
+  lines       JournalLine[]
+  @@unique([sourceType, sourceId, entryKind]) // ACC-19: قيد واحد لكل مصدر ونوع
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id           String  @id @default(uuid()) @db.Uuid
+  entryId      String  @db.Uuid
+  accountId    String  @db.Uuid
+  costCenterId String? @db.Uuid
+  branchId     String? @db.Uuid
+  debit        Decimal @default(0) @db.Decimal(14, 2)
+  credit       Decimal @default(0) @db.Decimal(14, 2)
+  memo         String?
+  entry        JournalEntry @relation(fields: [entryId], references: [id])
+  account      Account      @relation(fields: [accountId], references: [id])
+  @@index([accountId])
+  @@map("journal_lines")
+}
+
+// ───────────── البنية المشتركة ─────────────
+
+model OutboxEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  type        String
+  aggregateType String
+  aggregateId String    @db.Uuid
+  payload     Json
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  processedAt DateTime? @db.Timestamptz
+  attempts    Int       @default(0)
+  lastError   String?
+  @@index([processedAt, createdAt])
+  @@map("outbox_events")
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?  @db.Uuid
+  action     String
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String?   @db.Uuid
+  userId     String?   @db.Uuid
+  title      String
+  body       String
+  target     String?
+  readAt     DateTime? @db.Timestamptz
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  @@index([customerId, createdAt])
+  @@map("notifications")
+}
+
+model IntegrationLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  provider    String
+  operation   String
+  reference   String?
+  status      String   // SUCCESS | FAILED | RETRYING
+  attempts    Int      @default(1)
+  request     Json?    // بلا أسرار ولا بيانات بطاقات
+  response    Json?
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  @@index([provider, status, createdAt])
+  @@map("integration_logs")
+}
+
+model Attachment {
+  id         String   @id @default(uuid()) @db.Uuid
+  storageKey String   @unique
+  mimeType   String
+  sizeBytes  Int
+  entityType String
+  entityId   String
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  @@map("attachments")
+}
