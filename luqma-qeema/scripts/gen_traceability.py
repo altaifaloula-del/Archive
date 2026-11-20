@@ -32,8 +32,9 @@ for line in src.read_text(encoding="utf-8").splitlines():
     rid, mod, desc, pri, phase = f[:5]
     status = f[5] if len(f) > 5 and f[5] else "موثّق – لم يبدأ التنفيذ"
     path = f[6] if len(f) > 6 and f[6] else PATHS[mod]
+    accept = f[7] if len(f) > 7 and f[7] else "معلّق"
     rows.append(dict(id=rid, section=cur, module=mod, desc=desc, pri=pri, phase=int(phase),
-                     path=path, test=f"T-{rid}", status=status, accept="معلّق"))
+                     path=path, test=f"T-{rid}", status=status, accept=accept))
 
 ids = [r["id"] for r in rows]
 dups = [i for i, c in collections.Counter(ids).items() if c > 1]
