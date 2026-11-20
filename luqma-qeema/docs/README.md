@@ -19,7 +19,7 @@
 | DESIGN_SYSTEM.md (في `brand/`) | 2 | ✅ 1.0 |
 | UX_UI_SPECIFICATION.md | 2 | ✅ 1.0 |
 | PHASE2_REVIEW.md | 2 | ✅ بانتظار الاعتماد |
-| SYSTEM_ARCHITECTURE.md | 3 | لم تبدأ |
+| SYSTEM_ARCHITECTURE.md | 3 | ✅ 0.1 مسودة (7 قرارات ADR بانتظار الاعتماد) |
 | DATABASE_SCHEMA.md | 3 | لم تبدأ |
 | API_SPECIFICATION.md | 3 (تُولّد من OpenAPI) | لم تبدأ |
 | SECURITY_POLICY.md | 3، تُستكمل في 12 | لم تبدأ |
