@@ -15,9 +15,10 @@
 | `_source/BRAND_DIRECTIVE.md` | المرجع الأعلى للهوية | ✅ نص المالك محفوظ حرفياً |
 | `_source/BRAND_DIRECTIVE_ADDENDUM_MEALS.md` | ملحق إلزامي: النشاط وجبات وتوصيل | ✅ نص المالك محفوظ حرفياً |
 | SCOPE_IMPACT_READY_MEALS.md | أثر النشاط على المتطلبات | ✅ معتمد ومطبّق |
-| BRAND_GUIDELINES.md (في `brand/`) | 2 | لم تبدأ — تنتظر OI-28 |
-| DESIGN_SYSTEM.md | 2 | لم تبدأ |
-| UX_UI_SPECIFICATION.md | 2 | لم تبدأ |
+| BRAND_GUIDELINES.md (في `brand/`) | 2 | ✅ 1.0 |
+| DESIGN_SYSTEM.md (في `brand/`) | 2 | ✅ 1.0 |
+| UX_UI_SPECIFICATION.md | 2 | ✅ 1.0 |
+| PHASE2_REVIEW.md | 2 | ✅ بانتظار الاعتماد |
 | SYSTEM_ARCHITECTURE.md | 3 | لم تبدأ |
 | DATABASE_SCHEMA.md | 3 | لم تبدأ |
 | API_SPECIFICATION.md | 3 (تُولّد من OpenAPI) | لم تبدأ |

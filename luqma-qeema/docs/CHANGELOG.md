@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [0.9.0] — 2026-11-20 — اكتمال المرحلة 2 للمراجعة
+### أُضيف
+- `docs/UX_UI_SPECIFICATION.md` و`docs/PHASE2_REVIEW.md`. 16 متطلباً إضافياً صارت «منفّذ – بانتظار القبول».
+
 ## [0.8.1] — 2026-11-20 — ترتيبات الشعار
 ### أُضيف
 - `logo-vertical*` و`logo-horizontal*` و`logo-horizontal-tagline*` (12 ملفاً). BRD-07 وBRD-21 صارا «منفّذ – بانتظار القبول». OI-34 محسوم.
