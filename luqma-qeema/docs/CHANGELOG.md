@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [0.6.0] — 2026-11-20 — الشعار المعتمد الإصدار 2
+### تغيّر
+- استبدال `brand/master-logo/logo-master.png` بالإصدار 2 بقرار المالك؛ أرشفة الإصدار 1 ووثائقه.
+- إعادة `MASTER_LOGO_INSPECTION.md` و`LOGO_GEOMETRY.md` و`geometry/` و`colors/color-palette.proposed.json` على الإصدار 2.
+
 ## [0.5.0] — 2026-11-20 — ملحق الوجبات والتوصيل
 ### أُضيف
 - `_source/BRAND_DIRECTIVE_ADDENDUM_MEALS.md` (نص المالك).
