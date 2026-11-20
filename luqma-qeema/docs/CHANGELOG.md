@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [0.4.1] — 2026-11-20 — تثبيت الأصل
+### أُضيف
+- `brand/master-logo/logo-master.png` و`brand/applications/reference/brand-board-owner.png` كما استُلما.
+- `brand/MASTER_LOGO_INSPECTION.md` و`brand/colors/color-palette.proposed.json`.
+- OI-29.
+
 ## [0.4.0] — 2026-11-20 — أمر الهوية الإلزامي
 ### أُضيف
 - `docs/_source/BRAND_DIRECTIVE.md` (نص المالك)، و19 متطلباً BRD-16..BRD-34 (الإجمالي 270)، وOI-28.
