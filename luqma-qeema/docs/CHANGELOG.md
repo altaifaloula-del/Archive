@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [0.8.0] — 2026-11-20 — نظام التصميم
+### أُضيف
+- `packages/design-tokens/`، و`brand/fonts/`، و`brand/BRAND_GUIDELINES.md` و`DESIGN_SYSTEM.md` و`DIGITAL_APPLICATIONS.md` و`PRINT_SPECIFICATIONS.md`، و`brand/applications/mockups/`.
+### تغيّر
+- `scripts/check_brand.py` يفحص الألوان المخالفة. 24 متطلباً صارت «منفّذ – بانتظار القبول».
+
 ## [0.7.0] — 2026-11-20 — الشعار المتجهي
 ### أُضيف
 - `brand/master-logo/logo-master.svg|pdf|png`، و`brand/logo-variants/` (12 ملفاً)، و`brand/exports/`، وأيقونة التطبيق، و`colors/color-palette.json` المعتمد.

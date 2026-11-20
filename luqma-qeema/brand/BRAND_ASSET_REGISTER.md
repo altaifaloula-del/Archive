@@ -20,7 +20,11 @@
 | fonts/ | خط الشعار من المالك؛ خط الواجهة يُقترح للاعتماد | ينتظر الأصل |
 | LOGO_GEOMETRY.md | من الإصدار 2 PNG | ✅ مؤقت 0.2 (يُعاد من المتجهي) |
 | geometry/logo-geometry-grid.png · logo-safe-area.png · logo-min-size-test.png | رسوم التوثيق | ✅ |
-| BRAND_GUIDELINES.md · DESIGN_SYSTEM.md · DIGITAL_APPLICATIONS.md · PRINT_SPECIFICATIONS.md | تُعد بعد اعتماد الألوان والخطوط | لم تبدأ |
+| BRAND_GUIDELINES.md · DESIGN_SYSTEM.md · DIGITAL_APPLICATIONS.md | دليل الهوية ونظام التصميم والتطبيقات الرقمية | ✅ 1.0 (2026-11-20) |
+| PRINT_SPECIFICATIONS.md | مواصفات الطباعة | ✅ 0.9 (تنتظر بروفة المطبعة) |
+| fonts/ibm-plex-sans-arabic · fonts/ibm-plex-sans | خط الواجهة المعتمد (woff2، رخصة OFL)؛ TTF لتطبيقات Flutter في م8 | ✅ |
+| ../packages/design-tokens/ | tokens.json والمولَّدات CSS وDart | ✅ 1.0 |
+| applications/mockups/ | نماذج تطبيق الهوية (8) | ✅ اعتمدها المالك أسلوباً |
 | BRAND_ASSET_REGISTER.md · BRAND_CHANGE_CONTROL.md | — | ✅ موجود |
 | logo-variants/logo-wordmark.svg (+ white/black/mono-emerald) | الاسم منفرداً للشريط العلوي (OI-29-ج) | ✅ |
 | exports/png/ · exports/logo-variants-sheet.png | تصديرات PNG شفافة بأحجام متعددة، ولوحة النسخ | ✅ |
