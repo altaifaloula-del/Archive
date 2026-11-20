@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [0.7.0] — 2026-11-20 — الشعار المتجهي
+### أُضيف
+- `brand/master-logo/logo-master.svg|pdf|png`، و`brand/logo-variants/` (12 ملفاً)، و`brand/exports/`، وأيقونة التطبيق، و`colors/color-palette.json` المعتمد.
+### تغيّر
+- فصل كلمتي الاسم؛ الأصل النقطي نُقل إلى `master-logo/source/`. OI-22 وOI-28 وOI-29 محسومة؛ أُضيف OI-34.
+
 ## [0.6.0] — 2026-11-20 — الشعار المعتمد الإصدار 2
 ### تغيّر
 - استبدال `brand/master-logo/logo-master.png` بالإصدار 2 بقرار المالك؛ أرشفة الإصدار 1 ووثائقه.

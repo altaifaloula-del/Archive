@@ -1,0 +1,82 @@
+{
+  "status": "approved by owner 2026-11-20 (OI-22)",
+  "source": "brand/master-logo/source/logo-owner-original-v2.png",
+  "colors": {
+    "emerald": {
+      "role": "primary",
+      "hex": "#084828",
+      "rgb": [
+        8,
+        72,
+        40
+      ],
+      "cmyk_naive": [
+        89,
+        0,
+        44,
+        72
+      ]
+    },
+    "gold": {
+      "role": "secondary / distinction — decoration only on light backgrounds",
+      "hex": "#F0B028",
+      "rgb": [
+        240,
+        176,
+        40
+      ],
+      "cmyk_naive": [
+        0,
+        27,
+        83,
+        6
+      ]
+    },
+    "ivory": {
+      "role": "backgrounds",
+      "hex": "#FCF8EC",
+      "rgb": [
+        252,
+        248,
+        236
+      ],
+      "cmyk_naive": [
+        0,
+        2,
+        6,
+        1
+      ]
+    },
+    "orange": {
+      "role": "offers / savings — fills and large text",
+      "hex": "#F07810",
+      "rgb": [
+        240,
+        120,
+        16
+      ],
+      "cmyk_naive": [
+        0,
+        50,
+        93,
+        6
+      ]
+    }
+  },
+  "text_variants": {
+    "gold_text": "#8A5A00",
+    "orange_text": "#B04A00",
+    "ink": "#1D2A24",
+    "ink_muted": "#5B6B63"
+  },
+  "artwork_only": {
+    "leaf_green": "#2C801C",
+    "leaf_light": "#78B030",
+    "gold_light": "#F6D27E",
+    "gold_dark": "#DE961E",
+    "cream": "#F6D696"
+  },
+  "pending": [
+    "Final print CMYK and nearest Pantone need a printer's proof (cmyk_naive is a math conversion only)."
+  ]
+}
