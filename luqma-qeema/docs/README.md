@@ -13,6 +13,8 @@
 | COMPLIANCE_REGISTER.md | 1 | ✅ |
 | PROJECT_STATUS.md / CHANGELOG.md | كل جلسة | ✅ |
 | `_source/BRAND_DIRECTIVE.md` | المرجع الأعلى للهوية | ✅ نص المالك محفوظ حرفياً |
+| `_source/BRAND_DIRECTIVE_ADDENDUM_MEALS.md` | ملحق إلزامي: النشاط وجبات وتوصيل | ✅ نص المالك محفوظ حرفياً |
+| SCOPE_IMPACT_READY_MEALS.md | أثر النشاط على المتطلبات | ✅ معتمد ومطبّق |
 | BRAND_GUIDELINES.md (في `brand/`) | 2 | لم تبدأ — تنتظر OI-28 |
 | DESIGN_SYSTEM.md | 2 | لم تبدأ |
 | UX_UI_SPECIFICATION.md | 2 | لم تبدأ |

@@ -17,6 +17,8 @@ PATHS = {
     "integration": "apps/api/src/modules/integrations/", "security": "apps/api/src/modules/auth/",
     "reports": "apps/api/src/modules/reports/", "compliance": "docs/COMPLIANCE_REGISTER.md",
     "qa": "tests/", "docs": "docs/", "handover": "docs/DEPLOYMENT_GUIDE.md",
+    "menu": "apps/api/src/modules/menu/", "recipes": "apps/api/src/modules/recipes/",
+    "kitchen": "apps/kitchen/", "ops": "apps/admin/src/app/operations/", "driver": "apps/driver/",
 }
 PRI = {"P0": "شرط للتشغيل التجريبي", "P1": "شرط للإطلاق التجاري", "P2": "أساس معماري للتوسع"}
 
