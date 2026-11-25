@@ -25,3 +25,13 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 | wajdoo / najhoo / basmoo | وجد / نجاح / بسمة | متاح | لا تعارض | معنى ضعيف أو نطق ثقيل |
 
 لم يُفحص: سجل SAIP وWIPO، ونطاقات .sa/.app.
+
+## تصحيح: Yusroo
+بحث أعمق كشف **Yusr** (Yusr Tech Forfaiting، دبي، 2025): تقنية مالية خليجية (تقسيط Yusr Pay، تمويل منشآت Yusr Capital) — الجزء المميز «Yusr» مطابق ⇒ Yusroo **مرتفع الخطر**. yusr.com وyusrtech.com وyusrsoft.com محجوزة.
+
+## اسم الشركة والاسم المختصر (فحص .com من Verisign)
+| الاسم | .com | بدائل متاحة |
+|---|---|---|
+| qatiba.com | **متاح** | — |
+| maknaz.com | محجوز | getmaknaz.com، maknazapp.com، maknaztech.com متاحة |
+| wasaq.com | محجوز | — |
