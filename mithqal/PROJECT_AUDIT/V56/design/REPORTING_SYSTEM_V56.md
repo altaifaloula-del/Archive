@@ -17,7 +17,7 @@
 | Statement | `ledger` | سطر رصيد افتتاحي وختامي (`spec.opening/closing`) |
 | Summary | `summary` | مؤشرات بارزة مع اتجاه ▲/▼ (`kpis[].delta`) ثم جدول |
 | Official Document | `document` (`official`) | ترويسة متمركزة، أعدّه/اعتمده، موضع الختم |
-| Pivot | `matrix` (`pivot`) | `rptPivot`: مجموع قيمة لكل صف×عمود + إجماليات (عرض فقط) |
+| Pivot | `matrix` (`pivot`) | `rptPivot`: مجموع قيمة لكل صف×عمود + إجماليات (عرض فقط). **تفاعلي على الشاشة** في `RptTable` (زر «تبديل الصفوف والأعمدة») بالدالة نفسها، فالشاشة = الطباعة = Excel = CSV. لا يوجد بعد تقرير قائم يعرّف مواصفة محورية — المكوّن جاهز |
 
 ## خيارات المنشأة
 `reportTpl`: standard / minimal (خطوط أخف) / boxed (إطار بلون المنشأة)؛ `print.paper`؛ `print.mono` (أحادي اللون، شعار رمادي)؛ أو `spec.mono` لكل طباعة.

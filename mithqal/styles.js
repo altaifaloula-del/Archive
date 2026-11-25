@@ -48,6 +48,8 @@ html,body{margin:0;padding:0;width:100%;max-width:100%;overflow-x:hidden;positio
   --brass:var(--acc);
   --brass-d:color-mix(in srgb,var(--brass) 76%,#000);
   --brass-l:color-mix(in srgb,var(--brass) 70%,#fff);
+  /* v56.0 (DESIGN-V56-013): ذهبي آمن للنص — في الداكن الفاتح كما هو، وفي الفاتح الداكن (تباين ≥ 4.5:1)؛ كان --brass-l نصًا على أبيض بتباين ≈ 2.5:1 */
+  --brass-t:var(--brass-l);
   --line-g:color-mix(in srgb,var(--brass) 26%,var(--line));
   --num:var(--txt); --acc-soft:color-mix(in srgb,var(--brass) 11%,transparent);
   --frame:color-mix(in srgb,var(--brass) 45%,transparent); --frame-o:color-mix(in srgb,var(--brass) 17%,transparent);
@@ -838,7 +840,7 @@ body.lh-dragging *{cursor:grabbing !important}
 /* ===== v6.2: الدخول السريع (رقم سري) + محرّر الصورة ===== */
 .loginseg{display:flex;gap:6px;background:var(--ink3);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:14px}
 .loginseg-b{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 6px;border-radius:9px;border:none;background:transparent;color:var(--dim);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
-.loginseg-b.on{background:var(--ink);color:var(--brass-l);box-shadow:inset 0 0 0 1px var(--brass-d)}
+.loginseg-b.on{background:var(--ink);color:var(--brass-t);box-shadow:inset 0 0 0 1px var(--brass-d)}
 .gate-err{color:var(--rose);font-size:12px;text-align:center;margin-bottom:10px}
 .pin-dots{display:flex;gap:12px;justify-content:center;margin:4px 0 14px}
 .pin-dot{width:13px;height:13px;border-radius:50%;border:2px solid var(--faint);transition:.15s}
@@ -864,21 +866,21 @@ body.lh-dragging *{cursor:grabbing !important}
 .appc:hover{transform:translateY(-2px);box-shadow:var(--sh-3);border-color:var(--frame)}
 .appc.soon{opacity:.6}
 .appc-top{display:flex;align-items:flex-start;gap:10px;padding-inline-end:26px}
-.appc-ic{width:38px;height:38px;border-radius:11px;background:var(--acc-soft);border:1px solid var(--frame-o);display:grid;place-items:center;color:var(--brass-l);flex-shrink:0}
+.appc-ic{width:38px;height:38px;border-radius:11px;background:var(--acc-soft);border:1px solid var(--frame-o);display:grid;place-items:center;color:var(--brass-t);flex-shrink:0}
 .appc-n{font-weight:800;font-size:13.5px;line-height:1.3}
 .appc-e{font-size:9px;color:var(--faint);letter-spacing:.04em;direction:ltr}
 .appc-d{font-size:10.8px;color:var(--dim);line-height:1.6;flex:1}
 .appc-f{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .appc-star{position:absolute;inset-inline-end:7px;inset-block-start:7px;background:none;border:none;cursor:pointer;color:var(--faint);padding:4px;border-radius:8px;line-height:1}
-.appc-star.on{color:var(--brass-l)}
-.appc-star:hover{background:var(--acc-soft);color:var(--brass-l)}
+.appc-star.on{color:var(--brass-t)}
+.appc-star:hover{background:var(--acc-soft);color:var(--brass-t)}
 .appcat{display:flex;align-items:center;gap:9px;margin:14px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
 .appcat .t{font-family:'MizanNum',var(--font-head,'Markazi Text',serif);font-size:18.5px;font-weight:700}
 .appcat .c{font-size:10px;color:var(--faint)}
 .appstrip{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:2px}
 .appchip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--line-g);background:var(--ink2);color:var(--txt);font-size:11.5px;cursor:pointer;font-family:inherit;transition:border-color var(--t-fast),background var(--t-fast)}
 .appchip:hover{border-color:var(--frame);background:var(--ink3)}
-.appchip .st{color:var(--brass-l)}
+.appchip .st{color:var(--brass-t)}
 @media(max-width:560px){.appgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.appc{padding:11px}.appc-e{display:none}}
 @media(max-width:352px){.appgrid{grid-template-columns:1fr}}
 
@@ -952,7 +954,7 @@ td.num,th.num{display:table-cell}
 
 .is-tb .is-pct{color:var(--faint);font-size:11.5px;width:70px}
 .is-tb tr.is-line td:first-child{color:var(--dim);padding-inline-start:14px}
-.is-tb tr.is-head td{font-weight:800;color:var(--brass-l,var(--brass));padding-top:14px;border-bottom:0}
+.is-tb tr.is-head td{font-weight:800;color:var(--brass-t,var(--brass));padding-top:14px;border-bottom:0}
 .is-tb tr.is-grp td{font-weight:600}
 .is-tb tr.is-sub td{font-weight:700;border-top:1px solid var(--line)}
 .is-tb tr.is-total td{font-weight:800;background:rgba(201,162,77,.07);border-top:1px solid var(--line2,var(--line))}
@@ -2024,4 +2026,5 @@ table.tb.tb-fp{min-width:520px}
 .rd-bar i{display:block;width:100%;max-width:38px;background:var(--brass);border-radius:4px 4px 0 0;opacity:.85}.rd-bar i.neg{background:var(--rose)}.rd-bar span{font-size:10.5px;color:var(--faint)}
 /* v56.0 (DESIGN-V56-009): ملخص المحاسبة يتكرر أعلى كل أقسامها الـ31 — على الجوال صار شبكة 2×2 مضغوطة بلا أسطر فرعية فيظهر محتوى القسم مبكرًا */
 @media (max-width:640px){.rms .acct-sum{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:6px !important}.rms .acct-sum .kpi{padding:8px 10px !important;min-height:0 !important}.rms .acct-sum .kpi-s,.rms .acct-sum .kpi::before,.rms .acct-sum .kpi::after,.rms .acct-sum .kpi-l svg{display:none !important}.rms .acct-sum .kpi-l{font-size:11.5px !important;margin:0 0 2px !important}.rms .acct-sum .kpi-v{font-size:17px !important;line-height:1.3 !important}}
+.rms.mode-light{--brass-t:var(--brass-d)}
 `;

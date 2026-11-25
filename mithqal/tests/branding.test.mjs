@@ -133,3 +133,12 @@ test('هوية الفرع: لون الفرع يغلب في مستنداته وف
   assert.match(E.rptHtml(o, spec({ meta: { branchId: 'b1', user: 'م', at: '2026-04-01T09:00:00Z' } })), /--tb-p:#AA3300/);
   assert.equal(E.dirOf(o).branches.find(b => b.id === 'b2').brandColor, '', 'الدليل يحمل اللون المعقّم');
 });
+
+test('الجدول المحوري التفاعلي: ناتج rptPivot جدول عادي لا يُحوَّل ثانية عند الطباعة، وتبديل الصفوف والأعمدة يحفظ الإجمالي', () => {
+  const rows = [{ br: 'العليا', m: '2026-01', v: 100 }, { br: 'النخيل', m: '2026-02', v: 30 }, { br: 'العليا', m: '2026-02', v: 20 }];
+  const P = E.rptPivot({ title: 'x', template: 'pivot', rows, pivot: { row: 'br', col: 'm', val: 'v', rowLabel: 'الفرع' } });
+  assert.equal(P.pivot, undefined); assert.equal(P.template, 'matrix');
+  const h = E.rptHtml(orgA, P); assert.ok(h.includes('150.00'), 'طباعة الناتج المحوري كما هو');
+  const S = E.rptPivot({ title: 'x', template: 'pivot', rows, pivot: { row: 'm', col: 'br', val: 'v' } });
+  assert.deepEqual(S.columns.map(c => c.label).slice(1, 3), ['العليا', 'النخيل']); assert.equal(E.rptTotals(S)._t, E.rptTotals(P)._t);
+});

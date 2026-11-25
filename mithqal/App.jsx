@@ -1803,7 +1803,8 @@ function rptPivot(spec) {
   const t = P.valType || 'money';
   const columns = [{ key: '_r', label: P.rowLabel || P.row, en: P.rowLabelEn }, ...cols.map((c, i) => ({ key: '_c' + i, label: c, type: t, total: 'sum' })), { key: '_t', label: 'الإجمالي', en: 'Total', type: t, total: 'sum' }];
   const rows = [...acc.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([rk, m]) => { const o = { _r: rk }; let tot = 0; cols.forEach((c, i) => { o['_c' + i] = m[c] || 0; tot += m[c] || 0; }); o._t = Math.round(tot * 1000) / 1000; return o; });
-  return { ...spec, columns, rows, groups: [] };
+  const { pivot: _pv, ...rest } = spec;   // الناتج جدول عادي — لا يُحوَّل مرة ثانية عند الطباعة/التصدير
+  return { ...rest, template: 'matrix', columns, rows, groups: [] };
 }
 function rptHtml(org, spec0) {
   const tpl = rptTpl(spec0.template);
@@ -5347,8 +5348,8 @@ function FbGate({ css, theme, fbLogin, fbMfa, fbFirstSetup, notice }) {
             <span className="badge b-mint"><Lock size={10} />مصادقة سحابية مفعّلة</span>
           </div>
           <div className="card">
-            {notice && <div style={{ border: '1px solid rgba(200,162,74,.45)', background: 'rgba(200,162,74,.10)', color: 'var(--brass-l)', borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 12, lineHeight: 1.8, textAlign: 'center' }}>{notice}</div>}
-            {setup && <div style={{ border: '1px solid rgba(200,162,74,.4)', background: 'rgba(200,162,74,.08)', color: 'var(--brass-l)', borderRadius: 10, padding: '9px 12px', marginBottom: 12, fontSize: 11.5, lineHeight: 1.7 }}>
+            {notice && <div style={{ border: '1px solid rgba(200,162,74,.45)', background: 'rgba(200,162,74,.10)', color: 'var(--brass-t)', borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 12, lineHeight: 1.8, textAlign: 'center' }}>{notice}</div>}
+            {setup && <div style={{ border: '1px solid rgba(200,162,74,.4)', background: 'rgba(200,162,74,.08)', color: 'var(--brass-t)', borderRadius: 10, padding: '9px 12px', marginBottom: 12, fontSize: 11.5, lineHeight: 1.7 }}>
               الإعداد الأول (مرة واحدة بعد الترقية): أدخل بريد المالك وكلمة سر جديدة — يُنشأ حساب المصادقة وتصبح مديرًا للمنصة.
             </div>}
             {mfa ? (<>
@@ -5574,7 +5575,7 @@ function Gate({ css, org, onLogin, online, theme, notice }) {
             <span className="badge b-dim"><Lock size={10} />بيانات مشتركة ومؤمّنة</span>
           </div>
           <div className="card">
-            {notice && <div style={{ border: '1px solid rgba(200,162,74,.45)', background: 'rgba(200,162,74,.10)', color: 'var(--brass-l)', borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 12, lineHeight: 1.8, textAlign: 'center' }}>{notice}</div>}
+            {notice && <div style={{ border: '1px solid rgba(200,162,74,.45)', background: 'rgba(200,162,74,.10)', color: 'var(--brass-t)', borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 12, lineHeight: 1.8, textAlign: 'center' }}>{notice}</div>}
             {(hasPinUsers || mode === 'pin') && (
               <div className="loginseg">
                 <button type="button" className={'loginseg-b' + (mode === 'pass' ? ' on' : '')} onClick={() => { setMode('pass'); setErr(''); }}><Lock size={13} />كلمة السر</button>
@@ -12248,7 +12249,7 @@ function AppsStrip({ me, setTab, openAcctView, openInvView }) {
           <Clock size={11} />{a.ar}
         </button>
       ))}
-      <button className="appchip" style={{ borderColor: 'var(--frame)', color: 'var(--brass-l)' }} onClick={() => setTab('apps')}>
+      <button className="appchip" style={{ borderColor: 'var(--frame)', color: 'var(--brass-t)' }} onClick={() => setTab('apps')}>
         <Grid3x3 size={12} />فتح التطبيقات
       </button>
     </div>
@@ -13000,7 +13001,6 @@ function Launcher({ org, ops, me, myBranches, scoped, setTab, openAcctView, open
         <button type="button" className="lh-tasks" data-tasksbtn onClick={() => setTasksOpen(true)}><ListChecks size={17} />{TX('مهامي')}<span className="n" data-mywork-n>{workEv.length}</span></button>
       </div>
       {!qq && kpis.length > 0 && <div className="lh-kpis" data-homekpis>{kpis.map(k => <button key={k.id} type="button" className="lh-kpi" data-homekpi={k.id} style={{ '--k': k.tone }} onClick={() => setTab(k.tab)}><i aria-hidden="true" /><span><small>{k.ar}</small><b className="num">{k.v}</b></span></button>)}</div>}
-      {!qq && <RoleDashboard org={org} ops={scoped || ops} me={me} myBranches={myBranches} allowed={[...((ROLES[me.role] || {}).tabs || []), ...(me.appAllow || []).map(id => ((LAUNCH_IX[id] || {}).open || {}).tab).filter(Boolean)]} setTab={setTab} />}   {/* v56.0 لوحات الأدوار */}
       {tasksOpen && <><div className="lh-drawer-bg" onClick={() => setTasksOpen(false)} /><aside className="lh-drawer" role="dialog" aria-label="مهامي"><MyWork org={org} ops={ops} me={me} myBranches={myBranches} setTab={setTab} openAcctView={openAcctView} openInvView={openInvView} drawer onClose={() => setTasksOpen(false)} /></aside></>}
 
       {qq && matchedSecs.length > 0 && (
@@ -13023,6 +13023,7 @@ function Launcher({ org, ops, me, myBranches, scoped, setTab, openAcctView, open
         <div className="lh-grid" ref={gridRef}>{shown.map(a => Tile(a, !qq))}</div>
       </div>
       {shown.length === 0 && <div className="lh-empty">لا يوجد تطبيق بهذا الاسم — جرّب كلمة أخرى</div>}
+      {!qq && <RoleDashboard org={org} ops={scoped || ops} me={me} myBranches={myBranches} allowed={[...((ROLES[me.role] || {}).tabs || []), ...(me.appAllow || []).map(id => ((LAUNCH_IX[id] || {}).open || {}).tab).filter(Boolean)]} setTab={setTab} />}   {/* v56.0 لوحات الأدوار — بعد التطبيقات (قرار المالك v55: «التطبيقات أولًا») */}
       {!qq && <div className="lh-sec" data-hometoday><div className="lh-sect">{TX('ملخص اليوم والتقرير الصباحي')}</div><TodayPanel org={org} ops={ops} me={me} myBranches={myBranches} scoped={scoped} setTab={setTab} /></div>}
     </div>
     </>

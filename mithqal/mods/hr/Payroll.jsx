@@ -513,7 +513,7 @@ export function Payroll({ org, ops, me, myBranches, scoped, commit, commitOrg, s
               {emps.length > 0 && (() => { const tot = r2(sum(emps, e => eosFull(empGrossOf(e), tenureYears(e.hireDate, today())))); return (
                 <tr style={{ fontWeight: 800, background: 'rgba(200,162,74,.05)' }}>
                   <td colSpan={EOS.open ? 5 : 4}>مخصّص نهاية الخدمة التقديري (لو انتهت خدمة الجميع اليوم)</td>
-                  <td className="num" style={{ textAlign: 'end', color: 'var(--brass-l)' }}>{money(tot)}</td><td />
+                  <td className="num" style={{ textAlign: 'end', color: 'var(--brass-t)' }}>{money(tot)}</td><td />
                 </tr>
               ); })()}
             </tbody>
@@ -570,7 +570,7 @@ export function Payroll({ org, ops, me, myBranches, scoped, commit, commitOrg, s
                 {[['مدة الخدمة', fmtYears(years)], ['المكافأة الكاملة', money(full)], ['المستحق حسب السبب', money(entitled)], leaveDays ? ['بدل الإجازة المتبقية', money(leavePay)] : null].filter(Boolean).map((x, i) => (
                   <div key={i} className="row" style={{ justifyContent: 'space-between', fontSize: 12.5, padding: '3px 0' }}><span>{x[0]}</span><b className="num">{x[1]}</b></div>
                 ))}
-                <div className="row" style={{ justifyContent: 'space-between', fontWeight: 900, fontSize: 14, borderTop: '1px solid var(--frame-o)', marginTop: 6, paddingTop: 6 }}><span>إجمالي المخالصة</span><b className="num" style={{ color: 'var(--brass-l)' }}>{money(total)}</b></div>
+                <div className="row" style={{ justifyContent: 'space-between', fontWeight: 900, fontSize: 14, borderTop: '1px solid var(--frame-o)', marginTop: 6, paddingTop: 6 }}><span>إجمالي المخالصة</span><b className="num" style={{ color: 'var(--brass-t)' }}>{money(total)}</b></div>
               </div>
               {eosCentral && EOS.open && !EOS.paid[emp.id] && <div className="grid g2" style={{ marginTop: 10 }}>
                 <Field label="تاريخ الصرف"><input className="inp" type="date" value={eosF.payDate || today()} onChange={e => setEosF(f => ({ ...f, payDate: e.target.value }))} /></Field>
