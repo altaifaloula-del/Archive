@@ -5,7 +5,7 @@ import { EInvoiceOnboard } from './EInvoiceOnboard.jsx';
 import { RotateCcw, Scale, FileBarChart, ChevronDown, Printer, Settings, Receipt, BarChart3, Lock, Landmark, FileText, TrendingUp, ArrowLeftRight, Store, Users, QrCode, Building2, Truck, ClipboardCheck, ShieldCheck, CalendarDays, Download, Upload, Plus, Grid3x3, Check, Trash2, RefreshCw, Wallet, TrendingDown, AlertTriangle, ChevronRight, ShieldAlert, Eye, ChevronLeft, CircleDollarSign, X } from 'lucide-react';
 import { VatRegisters, SupplierPurchReport } from './TaxPurchReports.jsx';   // v39.1
 import { Suppliers } from '../inv/Suppliers.jsx';   // v44.0 «مستلم لم يُفوتر»
-import { OdooBar , SecPager, recurApply, canEditRec, dtLocal } from '../../App.jsx';   // v41.0
+import { OdooBar , SecPager, recurApply, canEditRec, dtLocal, yearEndNext } from '../../App.jsx';   // v41.0
 import { GeneralLedger } from './GeneralLedger.jsx';   // v49.4 المرحلة 03
 import { makeRptXlsx } from '../../App.jsx';   // v50.0 منظومة التقارير
 import { DEP_METHODS, depMethod, deprSchedule, wfOn, wfRequired, wfState, wfCanAct, wfApprove } from '../../App.jsx';   // v49.4 طرق الإهلاك
@@ -1243,7 +1243,7 @@ export function Accounting({ org, ops, me, commit, commitOrg, say, setTab, acctI
     const cd = (yeD.closeDate || '').slice(0, 10);
     if (yeD.enabled && !cd) return say('اختر تاريخ إقفال السنة', 'no');
     if (yeD.enabled && cd > today()) return say('تاريخ الإقفال في المستقبل — اختر تاريخًا منتهيًا', 'no');
-    await commitOrg(d => ({ ...d, yearEnd: { enabled: !!yeD.enabled, closeDate: cd } }), {
+    await commitOrg(d => ({ ...d, yearEnd: yearEndNext(d.yearEnd, yeD.enabled, cd) }), {   // v56.0: السنوات السابقة تبقى مُقفلة
       actionType: 'update', targetType: 'year_end', targetId: 'yearend',
       need: 'edit', title: yeD.enabled ? 'فعّل إقفال السنة المالية' : 'أوقف إقفال السنة المالية',
       details: yeD.enabled ? ('حتى ' + cd) : 'موقوف'
