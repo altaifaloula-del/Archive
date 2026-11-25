@@ -89,3 +89,10 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 ## دفعة مبتكرة ثالثة (name.com متاح شرط)
 - 29 اسمًا: متاح 12. استُبعد للمعنى: harmeko (harm)، samkera («سمكرة»)، kesmari (لفظ بذيء)، orleka (همزة)، delmika (قريب من DELMIA لبرمجيات التصنيع)، tazelra/qelmara/rabeeka (ثقيلة).
 - نظيفة في البحث: **mursina** (من «مرسى»)، **sarlimo**، **feldina**، **taqemo**.
+
+## كلمات مقترحة من المالك + دفعة مبتكرة رابعة
+- حلول: حلول بلس (ERP سحابي، الرياض) + حلول التواصل + Hulul/Hulul Tech + .com محجوزة ⇒ مستبعد.
+- الحل: .com محجوزة؛ يلتبس بـ Hala Business وتطبيقات «الحلال» ⇒ مستبعد.
+- نقاط: نقاطي (ولاء، جدة) + نقطة (Nugttah) + نُقطتي ⇒ مستبعد.
+- قويم: شركة قويم (qawim.sa) للمحاسبة وتطبيق الأنظمة المحاسبية، الرياض ⇒ مستبعد.
+- دفعة مبتكرة رابعة (24): متاح 14؛ نظيفة في البحث: **nasmeko** (نسمة)، **zafrena** (ظَفَر)، **rawdika** (روضة)، **qamrino** (قمر)، **maslora**.
