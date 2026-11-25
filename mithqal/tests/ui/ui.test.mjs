@@ -2618,7 +2618,7 @@ test('v50.3→v56.0 الهوية الرسمية: الرمز الهندسي ال�
     assert.deepEqual(r.d, ['8,86 26,86 26,32 8,14', '92,14 74,32 74,86 92,86', '33,14 50,31 50,55 33,38', '67,38 50,55 50,31 67,14'], 'مضلعات الرمز مطابقة للحزمة');
     assert.equal(r.paths, 0, 'بلا مسارات خطية');
     assert.deepEqual(r.c, ['rgb(16, 41, 74)', 'rgb(16, 41, 74)', 'rgb(217, 168, 62)', 'rgb(217, 168, 62)'], 'ألوان الحزمة #10294A و#D9A83E');
-    assert.match(r.t, /MITHQAL/); assert.match(r.t, /مثقال/, 'الاسم العربي يبقى عربيًا في الوضعين'); assert.match(r.t, /ERP/);
+    assert.match(r.t, /MUKTASAB/); assert.match(r.t, /مُكتسَب/, 'الاسم العربي يبقى عربيًا في الوضعين'); assert.match(r.t, /ERP/);
     assert.deepEqual(errs, []); await ctx.close();
   }
 });
@@ -2641,13 +2641,13 @@ test('v51.4 الفواتير والدفع لمنشأة مشتركة: الأسع�
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   const INV = { no: 'MQ-2026-000001', seq: 1, issuedAt: '2026-11-19T10:00:00.000Z', tenant: 'c2', plan: 'pro', period: 'monthly', start: '2026-11-19', end: '2026-12-18', net: 19900, vat: 2985, total: 22885, currency: 'SAR', status: 'paid', method: 'mada', paidAt: '2026-11-19T10:05:00.000Z',
-    seller: { name: 'مِثقال لتقنية المعلومات', vatNo: '311111111100003', crNo: '1010000000', address: 'الرياض' }, buyer: { name: 'مطعم تجريبي', vatNo: '300000000000003', address: 'الدمام' }, payments: [] };
+    seller: { name: 'مُكتسَب لتقنية المعلومات', vatNo: '311111111100003', crNo: '1010000000', address: 'الرياض' }, buyer: { name: 'مطعم تجريبي', vatNo: '300000000000003', address: 'الدمام' }, payments: [] };
   const calls = [];
   await p.route('http://zatca.test/api/billing/**', async (route) => { const u = new URL(route.request().url()); calls.push(route.request().method() + ' ' + u.pathname + ' ' + (route.request().postData() || ''));
     const J = (b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
     if (u.pathname.endsWith('/summary')) return J({ enabled: true, plan: 'pro', prices: { monthly: 19900, yearly: 199000 }, sub: { paidThrough: '2026-12-18', state: 'active' }, invoices: [{ ...INV, payments: undefined }],
-      methods: ['mada', 'card', 'applepay', 'stcpay', 'bank'], bank: { iban: 'SA0380000000608010167519', name: 'الراجحي', holder: 'مِثقال لتقنية المعلومات' }, seller: { name: INV.seller.name, vatNo: INV.seller.vatNo } });
-    if (u.pathname.endsWith('/checkout')) return J({ no: 'MQ-2026-000002', total: 228850, bank: { iban: 'SA0380000000608010167519', name: 'الراجحي', holder: 'مِثقال لتقنية المعلومات' }, reference: 'MQ-2026-000002' });
+      methods: ['mada', 'card', 'applepay', 'stcpay', 'bank'], bank: { iban: 'SA0380000000608010167519', name: 'الراجحي', holder: 'مُكتسَب لتقنية المعلومات' }, seller: { name: INV.seller.name, vatNo: INV.seller.vatNo } });
+    if (u.pathname.endsWith('/checkout')) return J({ no: 'MQ-2026-000002', total: 228850, bank: { iban: 'SA0380000000608010167519', name: 'الراجحي', holder: 'مُكتسَب لتقنية المعلومات' }, reference: 'MQ-2026-000002' });
     if (u.pathname.includes('/invoice/')) return J(INV);
     return J({}); });
   await p.goto(base + 'subcard'); await p.waitForSelector('.mq-bill', { timeout: 15000 }); await settle(p);
@@ -2657,7 +2657,7 @@ test('v51.4 الفواتير والدفع لمنشأة مشتركة: الأسع�
   assert.match(t, /المتقدمة/); assert.match(t, /2 \/ 5/);
   await p.click('input[name="mq-period"] >> nth=1'); await p.click('button:has-text("تحويل بنكي")'); await p.waitForSelector('.mq-bank');
   const bk = (await p.locator('.mq-bank').innerText()).replace(/\s+/g, ' ');
-  assert.match(bk, /SA0380000000608010167519/); assert.match(bk, /MQ-2026-000002/); assert.match(bk, /مِثقال لتقنية المعلومات/);
+  assert.match(bk, /SA0380000000608010167519/); assert.match(bk, /MQ-2026-000002/); assert.match(bk, /مُكتسَب لتقنية المعلومات/);
   assert.ok(calls.some(c => c.startsWith('POST /api/billing/checkout') && c.includes('"period":"yearly"') && c.includes('"method":"bank"')), calls.join('\n'));
   await p.click('button[title="طباعة الفاتورة"]'); await p.waitForSelector('.mz-docv iframe', { timeout: 8000 }); await p.waitForTimeout(400);
   const html = await p.evaluate(() => document.querySelector('.mz-docv iframe').srcdoc);
@@ -2667,7 +2667,7 @@ test('v51.4 الفواتير والدفع لمنشأة مشتركة: الأسع�
   assert.deepEqual(errs, []); await ctx.close();
 });
 
-test('v51.5 لوحة مِثقال: المنشآت والتوصيات والمفاتيح، تأكيد التحويل، وقبول طلب تسجيل يعرض أمر التهيئة', async () => {
+test('v51.5 لوحة مُكتسَب: المنشآت والتوصيات والمفاتيح، تأكيد التحويل، وقبول طلب تسجيل يعرض أمر التهيئة', async () => {
   const ctx = await browser.newContext({ viewport: { width: 1360, height: 1000 } }); const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   p.on('dialog', d => d.accept(d.type() === 'prompt' ? (/مرجع/.test(d.message()) ? 'TRX-77' : /المبلغ/.test(d.message()) ? '228.85' : /معرّف/.test(d.message()) ? 'burger-house' : '14') : undefined));
   const posts = []; let confirmed = false;
@@ -3358,7 +3358,7 @@ test('v56.0 هوية المنشأة: رفع شعار شفاف، الألوان �
   const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR42mNk+M9QzwAEjDAGNzYAAA2nAf9ex9uYAAAAAElFTkSuQmCC', 'base64');
   { const { p, errs, ctx } = await open({ viewport: { width: 1300, height: 1200 } }, 'live/TenantBranding/admin');
     const card = p.locator('[data-tenant-branding]');
-    assert.match(await card.innerText(), /هوية المنصة \(MITHQAL\) ثابتة/);
+    assert.match(await card.innerText(), /هوية المنصة \(MUKTASAB\) ثابتة/);
     await card.locator('[data-tb="nameAr"]').fill('مطاعم الواحة'); await card.locator('[data-tb="nameEn"]').fill('Oasis Restaurants');
     await card.locator('[data-tb-file="logo"]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: PNG }); await p.waitForTimeout(300);
     assert.match(await card.locator('[data-tb-logo="logo"] img').getAttribute('src'), /^data:image\/png;base64,/, 'الشعار PNG (الشفافية محفوظة)');

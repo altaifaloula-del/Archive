@@ -1,6 +1,6 @@
 /**
  * v56.0 — اختبارات قبول هوية المنشآت (أمر التصميم v56.0، القسم الثاني عشر) على المحرك الحقيقي.
- * منشأتان بهويتين مختلفتين ⇒ كل مستند يحمل هوية منشأته وحدها، ولا تُفرض هوية MITHQAL، والأرقام لا تتغير.
+ * منشأتان بهويتين مختلفتين ⇒ كل مستند يحمل هوية منشأته وحدها، ولا تُفرض هوية MUKTASAB، والأرقام لا تتغير.
  */
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,9 +50,9 @@ test('قبول 2–5: منشأتان بهويتين — كل تقرير يحمل
   assert.match(a2, /--tb-p:#000000/); assert.equal(E.rptHtml(orgB, spec()), b);
 });
 
-test('قبول: لا تُفرض ألوان MITHQAL على مستندات المنشأة (تقرير أو مستند) — ولا يظهر شعار المنصة فيها', () => {
+test('قبول: لا تُفرض ألوان MUKTASAB على مستندات المنشأة (تقرير أو مستند) — ولا يظهر شعار المنصة فيها', () => {
   for (const html of [E.rptHtml(orgA, spec()), E.rptHtml({ company: { name: 'بلا هوية' } }, spec())]) {
-    assert.doesNotMatch(html, /#10294A|#091A30/i, 'لا كحلي MITHQAL'); assert.doesNotMatch(html, /data-mq-symbol|mithqal-symbol/, 'لا رمز المنصة');
+    assert.doesNotMatch(html, /#10294A|#091A30/i, 'لا كحلي MUKTASAB'); assert.doesNotMatch(html, /data-mq-symbol|mithqal-symbol/, 'لا رمز المنصة');
   }
   const shell = E.rptShell ? E.rptShell(orgA, 'سند', '', '<p>x</p>') : null;
   if (shell) { assert.doesNotMatch(shell, /#10294A/i); assert.ok(shell.includes(PNG_A)); }
@@ -108,7 +108,7 @@ test('ثبات هوية المنصة: الرمز في الواجهة من اله
   const bs = src.slice(src.indexOf('const BrandSymbol = '), src.indexOf('const BRAND_MARK'));
   assert.doesNotMatch(bs, /org\b|branding|tenant/i, 'BrandSymbol لا يقرأ بيانات المنشأة');
   const { mqSymbolShapes } = await import('../brand-geom.js');
-  assert.equal(mqSymbolShapes().outer.length, 2); assert.equal(mqSymbolShapes().inner.length, 2);
+  assert.equal(mqSymbolShapes().outer.length, 3); assert.equal(mqSymbolShapes().inner.length, 1); assert.equal(mqSymbolShapes().minor.length, 4);   // v56.0 (إعادة التسمية) البوصلة
 });
 
 const INV = { id: 'si1', kind: 'invoice', type: 'simplified', no: 'INV-2026-00001', date: '2026-04-02', time: '10:30', branchId: 'b1', icv: 7, hash: 'a'.repeat(64),

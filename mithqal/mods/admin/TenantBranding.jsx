@@ -1,5 +1,5 @@
 /* v56.0 — «الهوية التجارية للمنشأة» (أمر التصميم v56.0، القسم الرابع)
-   هوية المنشأة مستقلة عن هوية المنصة MITHQAL: تُطبَّق في مساحتها من الإطار وفي تقاريرها ومستنداتها فقط.
+   هوية المنشأة مستقلة عن هوية المنصة MUKTASAB: تُطبَّق في مساحتها من الإطار وفي تقاريرها ومستنداتها فقط.
    الحفظ عبر commitOrg (مستند المنشأة — يكتبه مسؤول النظام وحده على الخادم) مع قيد في سجل التدقيق. */
 import React, { useState, useMemo, useRef } from 'react';
 import { Palette, Check, RotateCcw, Upload, X, Eye, Lock } from 'lucide-react';
@@ -83,8 +83,8 @@ export function TenantBranding({ org, me, commitOrg, say }) {
     <div className="card" data-tenant-branding>
       <div className="card-t" style={{ marginBottom: 6 }}><Palette size={15} color="var(--brass)" />الهوية التجارية للمنشأة</div>
       <div className="note" style={{ marginBottom: 12 }}>
-        هوية منشأتك تظهر في مساحتها من الواجهة وفي تقاريرك وفواتيرك ومستنداتك. <b>هوية المنصة (MITHQAL) ثابتة ولا تتغير من هنا</b>
-        <span className="tb-platform" title="هوية المنصة الثابتة"><span style={{ width: 18, height: 18, display: 'inline-block' }}><BrandSymbol /></span> MITHQAL</span>
+        هوية منشأتك تظهر في مساحتها من الواجهة وفي تقاريرك وفواتيرك ومستنداتك. <b>هوية المنصة (MUKTASAB) ثابتة ولا تتغير من هنا</b>
+        <span className="tb-platform" title="هوية المنصة الثابتة"><span style={{ width: 18, height: 18, display: 'inline-block' }}><BrandSymbol /></span> MUKTASAB</span>
       </div>
       {!canEdit && <div className="note" data-tb-readonly style={{ marginBottom: 10 }}><Lock size={13} /> للعرض فقط — يعدّل الهوية مسؤول النظام.</div>}
       <fieldset disabled={!canEdit} style={{ border: 0, padding: 0, margin: 0 }}>

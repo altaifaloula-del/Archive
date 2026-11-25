@@ -12,7 +12,7 @@ export function setLangGlobal(l) {
 }
 export const EN = {
   // ===== الهوية (v46.8) =====
-  'مِثقال': 'Mithqal', 'مِثقال — Mithqal': 'Mithqal', 'منصة واحدة، لكل الأعمال ومن أي مكان': 'One platform. Every business. Everywhere.', 'مِثقال (المعتمد)': 'Mithqal (default)',
+  'مُكتسَب': 'Muktasab', 'مُكتسَب — Muktasab': 'Muktasab', 'منصة واحدة، لكل الأعمال ومن أي مكان': 'One platform. Every business. Everywhere.', 'مُكتسَب (المعتمد)': 'Muktasab (default)', 'منصة الأعمال الذكية': 'Smart Business Platform',
   // ===== الإطار والتنقل =====
   'الرئيسية': 'Home', 'الإدارة المالية والتشغيلية': 'Finance & Operations', 'الموارد والرقابة': 'People & Control', 'التشغيل اليومي': 'Daily operations',
   'التحليل والتنبيهات': 'Analytics & Alerts', 'مركز التنبيهات': 'Alerts Center', 'مركز التقارير': 'Reports Center', 'المبيعات': 'Sales', 'نقطة البيع': 'Point of Sale',

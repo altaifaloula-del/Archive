@@ -28,7 +28,7 @@ async function tenant(b, T) {
   await b.close();
   const res = [];
   const check = (n, f) => { try { f(); res.push('PASS ' + n); } catch (e) { res.push('FAIL ' + n + ' — ' + e.message); } };
-  check('1 رمز MITHQAL مطابق حرفيًا في المنشأتين', () => assert.equal(A.mq, B.mq));
+  check('1 رمز MUKTASAB مطابق حرفيًا في المنشأتين', () => assert.equal(A.mq, B.mq));
   check('2-3 كل منشأة ترى اسمها في الشريط', () => { assert.equal(A.name, 'مطاعم الواحة'); assert.equal(B.name, 'مخابز السنبلة'); });
   check('3 كل منشأة ترى شعارها', () => { assert.ok(Buffer.from(A.logo.split(',')[1], 'base64').toString().includes('#0B6E4F')); assert.ok(Buffer.from(B.logo.split(',')[1], 'base64').toString().includes('#7A1F5C')); });
   check('4 لا تداخل بين المنشأتين', () => { assert.notEqual(A.logo, B.logo); assert.ok(!B.name.includes('الواحة')); });

@@ -1,4 +1,4 @@
-/* v50.4 — حارس الهوية الرسمية MITHQAL ERP: لا ألوان الهوية القديمة في الشاشات والمطبوعات، والملفات الرسمية كما هي في الحزمة */
+/* v50.4 — حارس الهوية الرسمية MUKTASAB: لا ألوان الهوية القديمة في الشاشات والمطبوعات، والملفات الرسمية كما هي في الحزمة */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
@@ -14,9 +14,11 @@ test('ملف التوكنات والرمز مطابقان للحزمة الرس�
   for (const [k, v] of [['navy', '#10294A'], ['gold', '#D9A83E'], ['deep-navy', '#091A30'], ['tech-blue', '#2671B9'], ['white', '#FFFFFF'], ['soft-gray', '#F3F5F8']]) assert.match(css, new RegExp('--mithqal-' + k + ':\\s*' + v));
   // v56.0 (أمر التصميم — قرار المالك: «النموذج الأول · Refine · Geometric · Flat»): الرمز القديم بالخطوط استُبدل بهندسة الكتل.
   // الحارس الآن يقفل الهندسة الجديدة: مضلعات الرمز في ملف الواجهة = المصدر الموحّد brand-geom.js، ولا نص حي ولا تدرجات في ملفات الشعار.
+  // v56.0 (إعادة التسمية) (قرار المالك 2026-11-25): الهوية «مُكتسَب» برمز البوصلة تحل محل رمز M لمثقال. الحارس يقفل هندسة البوصلة الجديدة.
   const sym = fs.readFileSync(path.join(root, 'public', 'brand', 'mithqal-symbol.svg'), 'utf8');
-  for (const p of ['8,86 26,86 26,32 8,14', '33,14 50,31 50,55 33,38']) assert.ok(sym.includes(p), 'مضلع الرمز ' + p);
-  assert.match(fs.readFileSync(path.join(root, 'brand-geom.js'), 'utf8'), /MQ_GEOM = Object\.freeze\(\{ x0: 8, w: 18, top: 14, bot: 86, gap: 7, t: 24 \}\)/);
+  for (const p of ['50,3 59.5,50 40.5,50', '50,97 40.5,50 59.5,50', '97,50 50,40.5 50,59.5', '3,50 50,59.5 50,40.5']) assert.ok(sym.includes(p), 'مضلع الرمز ' + p);
+  assert.match(sym, /<mask [^>]*>[\s\S]*<circle cx="50" cy="50" r="5.5"/, 'المركز المفرّغ');
+  assert.match(fs.readFileSync(path.join(root, 'brand-geom.js'), 'utf8'), /MQ_GEOM = Object\.freeze\(\{ c: 50, R: 47, W: 9\.5, r: 30, w: 6, h: 5\.5, minorOpacity: 0\.55 \}\)/);
   assert.match(fs.readFileSync(path.join(root, 'App.jsx'), 'utf8'), /mqSymbolShapes\(\)/, 'مكوّن الواجهة من الهندسة الموحّدة');
   const svgs = fs.readdirSync(path.join(root, 'brand', 'logo'), { recursive: true }).filter(f => f.endsWith('.svg'));
   assert.ok(svgs.length >= 23, 'كل نسخ الشعار موجودة');

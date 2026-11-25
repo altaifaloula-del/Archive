@@ -74,7 +74,7 @@ function Live() {
 let el;
 // v51.4: بطاقة الاشتراك لمنشأة مشتركة (الخادم يُحاكى في الاختبار بالتقاط طلبات /api/billing)
 const SubCard = React.lazy(() => import('../../mods/admin/SubscriptionCard.jsx').then(m => ({ default: m.SubscriptionCard })));
-// v51.5: لوحة مِثقال وصفحة التسجيل العام (الخادم يُحاكى بالتقاط /api/provider و/api/signup)
+// v51.5: لوحة مُكتسَب وصفحة التسجيل العام (الخادم يُحاكى بالتقاط /api/provider و/api/signup)
 const ProvC = React.lazy(() => import('../../mods/admin/ProviderConsole.jsx').then(m => ({ default: m.ProviderConsole })));
 const SignupP = React.lazy(() => import('../../mods/signup/SignupPage.jsx').then(m => ({ default: m.SignupPage })));
 if (kind === 'live') el = React.createElement(Live);

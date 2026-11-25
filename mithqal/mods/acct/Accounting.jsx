@@ -1364,7 +1364,7 @@ export function Accounting({ org, ops, me, commit, commitOrg, say, setTab, acctI
   const xlOne = (base, rows) => { try { dlBlob(base + '_' + expTag + '.xlsx', makeXlsx([{ name: base.replace(/_/g, ' ').slice(0, 28), rows }])); } catch (e) { say('تعذّر توليد Excel', 'no'); } };
   const xlCoa = () => xlOne('دليل_الحسابات', coaRows());
   // v50.0 (G2): اليومية والميزان بالقالب الموحد — ترويسة ورأس مجمّد وتنسيق أرقام ومجاميع بصيغ SUM حقيقية
-  const rptMeta = { user: me?.name || '', source: 'مِثقال — المحاسبة' };
+  const rptMeta = { user: me?.name || '', source: 'مُكتسَب — المحاسبة' };
   const rptPer = (from || to) ? ((from || '…') + ' ← ' + (to || '…')) : 'كل الفترات';
   const xlRpt = (base, spec) => { try { dlBlob(base + '_' + expTag + '.xlsx', makeRptXlsx(org, spec)); } catch (e) { say('تعذّر توليد Excel', 'no'); } };
   const xlJournal = () => xlRpt('دفتر_اليومية', { id: 'journal', title: 'دفتر اليومية', sub: rptPer, meta: rptMeta, filters: bfLabel ? [['الفرع', bfLabel]] : [],

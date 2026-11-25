@@ -1703,7 +1703,7 @@ table.tb.tb-fp{min-width:520px}
 
 /* ══════════════ v42.1 — هوية RESTAURANT PRO (كحلي وذهبي) — الثيم الافتراضي المعتمد ══════════════
    يرث مكوّنات «ميزان 2» النظيفة (themeCls يضيف thm-mizan) ويبدّل الألوان والقائمة الجانبية والعلامة.
-   رموز التصميم (v50.3 — حزمة الهوية الرسمية MITHQAL ERP، brand/mithqal-brand-tokens.css): Midnight Navy #10294A · Royal Gold #D9A83E · Deep Navy #091A30 · Technology Blue #2671B9 · Soft Gray #F3F5F8. */
+   رموز التصميم (v50.3 — حزمة الهوية الرسمية MUKTASAB، brand/mithqal-brand-tokens.css): Midnight Navy #10294A · Royal Gold #D9A83E · Deep Navy #091A30 · Technology Blue #2671B9 · Soft Gray #F3F5F8. */
 .rms.thm-restpro{--acc:#9B7934;--brand-fill:var(--mithqal-navy,#10294A);--brand-ink:#FFFFFF;--gold:var(--mithqal-gold,#D9A83E);--gold-l:#E8C677;--navy:var(--mithqal-navy,#10294A);--navy2:#183660;
   --font-ui:'IBM Plex Sans Arabic','Noto Sans Arabic','Tajawal',system-ui,-apple-system,'Segoe UI',sans-serif;--font-head:'IBM Plex Sans Arabic','Noto Sans Arabic','Tajawal',system-ui,sans-serif;--font-en:Manrope,'Segoe UI',system-ui,sans-serif;
   --side-bg:linear-gradient(180deg,var(--mithqal-navy,#10294A),var(--mithqal-deep-navy,#091A30));--side-txt:#CBD3DF;--side-dim:#8491A7;--side-on:#FFFFFF;--side-hl:rgba(255,255,255,.08);--side-w:258px}
@@ -1731,7 +1731,7 @@ table.tb.tb-fp{min-width:520px}
 .rms.thm-restpro .rp-brand{display:flex;flex-direction:column;min-width:0;flex:1}
 .rms.thm-restpro .rp-brand b{overflow:hidden;text-overflow:ellipsis;font-size:17px;letter-spacing:1px;color:#FFFFFF;font-family:'MizanNum','IBM Plex Sans Arabic',sans-serif;font-weight:800;white-space:nowrap}
 .rms.thm-restpro .rp-brand span{color:var(--gold-l);font-size:10.5px;margin-top:5px;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* v46.8 شعار «مِثقال» تحت الاسم (يلتف على سطرين) واسم المنشأة تحته */
+/* v46.8 شعار «مُكتسَب» تحت الاسم (يلتف على سطرين) واسم المنشأة تحته */
 .rms.thm-restpro .rp-brand span.rp-tag{white-space:normal;line-height:1.4;letter-spacing:0}
 .rms.thm-restpro .side .brand>.rp-mark{display:none}
 .rms.thm-restpro .rp-brand .rp-lockup{display:block;margin-bottom:2px}
@@ -1920,7 +1920,7 @@ table.tb.tb-fp{min-width:520px}
 .gate.has-cover .mq-bhead{display:none}
 .gate.has-cover .gate-cover.mq-cover{box-shadow:none !important}
 .gate:has(.mq-cover){background:#FFFFFF !important}
-/* v56.0 (DESIGN-V56-001): الوضع الداكن — جانب النموذج داكن (كان أبيض مفروضًا فيختفي عنوان المنشأة بلون النص الفاتح)؛ لوحة MITHQAL تبقى فاتحة كما قُرر */
+/* v56.0 (DESIGN-V56-001): الوضع الداكن — جانب النموذج داكن (كان أبيض مفروضًا فيختفي عنوان المنشأة بلون النص الفاتح)؛ لوحة MUKTASAB تبقى فاتحة كما قُرر */
 .rms.mode-dark .gate:has(.mq-cover),.mode-dark.gate:has(.mq-cover){background:var(--ink) !important}
 @media (max-width:959px){.gate.has-cover .gate-cover.mq-cover{aspect-ratio:auto;max-height:none;min-height:0;border-inline-end:0;border-bottom:1px solid #E3E7EE}.mq-cover-in{padding:22px 16px;gap:10px}.mq-cover-in .mq-lockup{transform:scale(.72);transform-origin:center}}
 @media (min-width:960px){
@@ -1934,7 +1934,7 @@ table.tb.tb-fp{min-width:520px}
   .gate.has-cover .gate-c{width:calc(100% - 28px)}
 }
 
-/* v47.2 شعار الشركة يرافق اسمها (شعار النظام «مِثقال» ثابت في العلامة) */
+/* v47.2 شعار الشركة يرافق اسمها (شعار النظام «مُكتسَب» ثابت في العلامة) */
 .rms.thm-restpro .rp-brand span.rp-co{display:flex;align-items:center;gap:5px}
 .co-logo{width:16px;height:16px;border-radius:4px;object-fit:cover;flex-shrink:0;background:#fff;border:1px solid rgba(255,255,255,.25)}
 .co-logo-t{width:24px;height:24px;border-radius:6px;vertical-align:-6px;margin-inline-end:7px;border-color:var(--line)}

@@ -1,5 +1,5 @@
-import { mqSymbolShapes, mqPoints } from './brand-geom.js';   // v56.0 هندسة رمز MITHQAL
-import React, { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
+import { mqSymbolShapes, mqPoints } from './brand-geom.js';   // v56.0 (إعادة التسمية) هندسة رمز مُكتسَب (البوصلة)
+import React, { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { Target,
   LayoutDashboard, ClipboardCheck, Banknote, Users, Building2, FileBarChart,
@@ -399,7 +399,7 @@ function shiftSumText(org, sh, ops) {
   L.push('💵 النقد: متوقع ' + money(sh.expected || 0) + ' · معدود ' + money(sh.counted || 0));
   L.push((Math.abs(d) > 0.004 ? (d < 0 ? '🔴 عجز ' : '🟡 زيادة ') + money(Math.abs(d)) : '✅ لا فرق نقدي'));
   if (sh.closeNote) L.push('ملاحظة: ' + sh.closeNote);
-  L.push(''); L.push('— ' + ((org.company || {}).name || 'مِثقال'));
+  L.push(''); L.push('— ' + ((org.company || {}).name || 'مُكتسَب'));
   return L.join('\n');
 }
 function closeAlertEvents(org, ops, me, myBranches) {
@@ -1693,7 +1693,7 @@ function makeXlsx(sheets) {
   add('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`);
   // v52.3: وقت إنشاء الملف في خصائصه (لا يغيّر صفوف البيانات — قوالب الاستيراد تبقى كما هي)
   const _ts = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-  add('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator>Mithqal</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${_ts}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${_ts}</dcterms:modified></cp:coreProperties>`);
+  add('docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator>Muktasab</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${_ts}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${_ts}</dcterms:modified></cp:coreProperties>`);
   add('xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${names.map((n, i) => `<sheet name="${_xe(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`);
   add('xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
   add('xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="164" formatCode="#,##0.00;(#,##0.00)"/><numFmt numFmtId="165" formatCode="#,##0.###"/><numFmt numFmtId="166" formatCode="0.0&quot;%&quot;"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE9EDF3"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="1" fillId="2" borderId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" applyFont="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/><xf numFmtId="166" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/><xf numFmtId="1" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/></cellXfs></styleSheet>`);
@@ -1736,11 +1736,11 @@ function rptTotals(spec) { const t = {}; (spec.columns || []).forEach(c => { if 
 const rptLbl = (spec, c) => spec.lang === 'en' && c.en ? c.en : c.label;
 /** HTML الطباعة الموحد: ترويسة بالشعار والهوية، رأس جدول يتكرر في كل صفحة، ترقيم صفحات، وتذييل بالوقت والمستخدم والمصدر */
 /* ============================================================
-   v56.0 — هوية المنشأة التجارية (Tenant Branding) — منفصلة تمامًا عن هوية المنصة MITHQAL
+   v56.0 — هوية المنشأة التجارية (Tenant Branding) — منفصلة تمامًا عن هوية المنصة MUKTASAB
    • org.branding تخص المنشأة وحدها (مستند منشأتها في مشروع Firebase الخاص بها — العزل مادي)، يكتبها مسؤول النظام فقط (القواعد: rms8_org).
    • tbNorm يعقّم كل حقل (ألوان HEX فقط، صور https أو data:image بحد حجم، نصوص بأطوال قصوى) — لا يُخزَّن ولا يُطبع ما لم يمر به.
    • tenantBrand يحلّ الهوية للاستعمال: الفرع (شعاره إن وُجد) ← هوية المنشأة ← بيانات الشركة القديمة (توافق رجعي).
-   • الألوان الافتراضية محايدة — لا تُفرض ألوان MITHQAL على مستندات المنشأة. شعار المنصة لا يمر من هنا إطلاقًا.
+   • الألوان الافتراضية محايدة — لا تُفرض ألوان MUKTASAB على مستندات المنشأة. شعار المنصة لا يمر من هنا إطلاقًا.
    ============================================================ */
 const TB_HEX = /^#[0-9A-Fa-f]{6}$/;
 const TB_NEUTRAL = Object.freeze({ primary: '#1F2A37', accent: '#8A6D3B', heading: '#111827', text: '#1F2937' });
@@ -1825,7 +1825,7 @@ function rptHtml(org, spec0) {
   const filt = !(spec.filters || []).length ? '' : tpl === 'document' ? `<div class="fl">${spec.filters.map(([k, v]) => '<b>' + _xe(k) + ':</b> ' + _xe(v)).join(' &nbsp;·&nbsp; ')}</div>` : `<div class="fl"><b>${L.filt}:</b> ${spec.filters.map(([k, v]) => _xe(k) + ': ' + _xe(v)).join(' · ')}</div>`;
   const sigs = (spec.signatures || []).length ? spec.signatures : tpl === 'document' ? [L.prep, L.appr] : [];
   const sig = sigs.length ? `<div class="sign">${sigs.map(x => `<div>${_xe(x)}</div>`).join('')}${tpl === 'document' ? `<div class="stamp">${L.stamp}</div>` : ''}</div>` : '';
-  const foot = `${L.by}: ${_xe(meta.user || '—')} · ${L.at} ${_xe(dtLocal(at))} · ${L.src}: ${_xe(meta.source || 'مِثقال')}`;
+  const foot = `${L.by}: ${_xe(meta.user || '—')} · ${L.at} ${_xe(dtLocal(at))} · ${L.src}: ${_xe(meta.source || 'مُكتسَب')}`;
   const tfoot = B.footer ? `<div class="tf">${_xe(B.footer)}</div>` : '';
   const left = en ? 'right' : 'left';
   return `<!doctype html><html dir="${dir}" lang="${en ? 'en' : 'ar'}"><head><meta charset="utf-8"><title>${_xe(spec.title)}</title><style>${typeof NUM_FACE === 'string' ? NUM_FACE : ''}${tbCss(B, { mono })}
@@ -1872,7 +1872,7 @@ function rptXlsxRows(org, spec) {
   const TBx = tenantBrand(org, { lang: spec.lang, branchId: meta.branchId });   // v56.0: اسم المنشأة من هويتها
   put([{ v: TBx.name || co.name || '', s: 4 }]); put([{ v: spec.title, s: 4 }]); if (spec.sub) put([spec.sub]);
   if ((spec.filters || []).length) put([(en ? 'Filters: ' : 'التصفية: ') + spec.filters.map(([k, v]) => k + ': ' + v).join(' · ')]);
-  put([(en ? 'Printed by ' : 'أعدّه ') + (meta.user || '—') + ' · ' + dtLocal(meta.at || new Date().toISOString()) + ' · ' + (meta.source || 'مِثقال')]);
+  put([(en ? 'Printed by ' : 'أعدّه ') + (meta.user || '—') + ' · ' + dtLocal(meta.at || new Date().toISOString()) + ' · ' + (meta.source || 'مُكتسَب')]);
   put([]);
   const head = rows.length; put(C.map(c => ({ v: rptLbl(spec, c), s: 1 })));
   const st = (c, bold) => c.type === 'money' ? (bold ? 3 : 2) : c.type === 'qty' ? 5 : c.type === 'pct' ? 6 : c.type === 'int' ? 7 : (bold ? 1 : 0);
@@ -2886,7 +2886,7 @@ const TAB_AR = {
 };
 // ═══ ثيمات المنصّة الاحترافية (11 أسلوب تصميم كامل) × وضع ليل/نهار — v14.7 ═══
 const THEME_META = {
-  restpro: { name: 'مِثقال (المعتمد)', desc: 'كحلي وذهبي فاخر', color: '#10294A' },
+  restpro: { name: 'مُكتسَب (المعتمد)', desc: 'كحلي وذهبي فاخر', color: '#10294A' },
   mizan: { name: 'ميزان 2', desc: 'واضح احترافي', color: '#C9A24D' },
   royal: { name: 'الملكي الذهبي', desc: 'فخم دافئ', color: '#A87D28' },
   glass: { name: 'الزجاجي الشفّاف', desc: 'بطاقات ضبابية', color: '#2E7CC4' },
@@ -2907,35 +2907,38 @@ const normTheme = (t) => THEME_META[t] ? t : (THEME_LEGACY[t] || 'restpro');
 const readMode = () => { try { return localStorage.getItem('rms8:mode') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; } };
 // v42.1: «RESTAURANT PRO» يرث مكوّنات «ميزان 2» ويبدّل الألوان والقائمة والعلامة
 const themeCls = (t, mode) => { const n = normTheme(t); return 'rms mode-' + (mode === 'dark' ? 'dark' : 'light') + (n === 'restpro' ? ' thm-mizan thm-restpro' : ' thm-' + n); };
-// v46.8: الهوية «مِثقال — Mithqal» وشعارها؛ الترجمة الإنجليزية في i18n.js (TX)
-const BRAND = 'مِثقال', BRAND_SUB = 'منصة واحدة، لكل الأعمال ومن أي مكان', BRAND_AR = 'مِثقال — Mithqal';
-// v56.0 — رمز MITHQAL الهندسي (أمر التصميم v56.0: النموذج الأول — Refine · Geometric · Flat): كتلتان كحليتان وذراعان ذهبيان
+// v56.0 (إعادة التسمية): الهوية «مُكتسَب — Muktasab» (قرار المالك 2026-11-25، تحل محل «مُكتسَب»)؛ الترجمة الإنجليزية في i18n.js (TX)
+const BRAND = 'مُكتسَب', BRAND_SUB = 'منصة الأعمال الذكية', BRAND_AR = 'مُكتسَب — Muktasab';
+// v56.0 (إعادة التسمية) — رمز «مُكتسَب» (البوصلة، قرار المالك 2026-11-25): رأس شمالي ذهبي، وثلاثة رؤوس كحلية، ورؤوس قطرية خفيفة، ومركز مفرّغ
 // من الهندسة الموحّدة brand-geom.js (المصدر نفسه لملفات brand/logo). نسختان: «light» (كحلي + ذهبي) و«dark» (أبيض + ذهبي) للخلفيات الكحلية.
 // الألوان من ملف التوكنات الموحّد brand/mithqal-brand-tokens.css (--mithqal-*) مع القيمة الرسمية احتياطًا. لا تغيّره أي منشأة.
 const MQ = { navy: 'var(--mithqal-navy,#10294A)', gold: 'var(--mithqal-gold,#D9A83E)', white: 'var(--mithqal-white,#FFFFFF)', deep: 'var(--mithqal-deep-navy,#091A30)' };
 const MQ_SHAPES = mqSymbolShapes();
 const BrandSymbol = ({ variant = 'light', size = '100%' }) => {
-  const dark = variant === 'dark';
+  const dark = variant === 'dark', ink = dark ? MQ.white : MQ.navy, mid = 'mqh' + useId().replace(/[^a-zA-Z0-9_-]/g, '');
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true" style={{ display: 'block' }} data-mq-symbol={variant}>
-      {MQ_SHAPES.outer.map((p, i) => <polygon key={'o' + i} points={mqPoints(p)} fill={dark ? MQ.white : MQ.navy} />)}
-      {MQ_SHAPES.inner.map((p, i) => <polygon key={'i' + i} points={mqPoints(p)} fill={MQ.gold} />)}
+      <defs><mask id={mid} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><rect width="100" height="100" fill="#fff" /><circle cx={MQ_SHAPES.hole.cx} cy={MQ_SHAPES.hole.cy} r={MQ_SHAPES.hole.r} fill="#000" /></mask></defs>
+      <g mask={`url(#${mid})`}>
+        {MQ_SHAPES.minor.map((p, i) => <polygon key={'m' + i} points={mqPoints(p)} fill={ink} opacity={MQ_SHAPES.minorOpacity} />)}
+        {MQ_SHAPES.outer.map((p, i) => <polygon key={'o' + i} points={mqPoints(p)} fill={ink} />)}
+        {MQ_SHAPES.inner.map((p, i) => <polygon key={'i' + i} points={mqPoints(p)} fill={MQ.gold} />)}
+      </g>
     </svg>);
 };
 // أيقونة التطبيق (مربع كحلي برمز ذهبي وأبيض) — مطابقة لـ mithqal-app-icon.svg
 const BRAND_MARK = () => <BrandSymbol variant="dark" size="72%" />;
-// الشعار الأفقي (رمز + MITHQAL + مثقال + ERP) بنص حيّ بخط الواجهة حتى يتشكّل العربي صحيحًا في كل المتصفحات.
+// الشعار الأفقي (رمز + MUKTASAB + مكتسب) بنص حيّ بخط الواجهة حتى يتشكّل العربي صحيحًا في كل المتصفحات.
 // lang: 'bi' ثنائي | 'ar' عربي | 'en' إنجليزي — كما في الحزمة. onDark: نسخة معكوسة للخلفية الكحلية (الرمز الداكن من الحزمة ونص أبيض).
 const BrandLockup = ({ lang = 'bi', onDark = false, height = 44 }) => {
   const ink = onDark ? MQ.white : MQ.navy;
   return (
-    <span className="mq-lockup" data-mq-lockup={lang} style={{ display: 'inline-flex', alignItems: 'center', gap: height * 0.22, height, direction: 'ltr' }} aria-label="MITHQAL ERP — مثقال">
+    <span className="mq-lockup" data-mq-lockup={lang} style={{ display: 'inline-flex', alignItems: 'center', gap: height * 0.22, height, direction: 'ltr' }} aria-label="Muktasab — مكتسب">
       <span style={{ width: height, height, flexShrink: 0 }}><BrandSymbol variant={onDark ? 'dark' : 'light'} /></span>
       <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1, gap: height * 0.1 }}>
-        {lang !== 'ar' && <span data-noi18n style={{ font: `800 ${height * 0.36}px/1 Manrope,var(--font-en,sans-serif)`, letterSpacing: height * 0.016, color: ink }}>MITHQAL</span>}
+        {lang !== 'ar' && <span data-noi18n style={{ font: `800 ${height * 0.36}px/1 Manrope,var(--font-en,sans-serif)`, letterSpacing: height * 0.016, color: ink }}>MUKTASAB</span>}
         <span style={{ display: 'flex', alignItems: 'baseline', gap: height * 0.16 }}>
-          {lang !== 'en' && <span data-noi18n lang="ar" dir="rtl" style={{ font: `700 ${lang === 'ar' ? height * 0.38 : height * 0.29}px/1.15 'IBM Plex Sans Arabic','Noto Sans Arabic',var(--font-ui,sans-serif)`, color: ink }}>مثقال</span>}
-          <span data-noi18n style={{ font: `700 ${height * 0.15}px/1 Manrope,var(--font-en,sans-serif)`, letterSpacing: height * 0.04, color: MQ.gold }}>ERP</span>
+          {lang !== 'en' && <span data-noi18n lang="ar" dir="rtl" style={{ font: `700 ${lang === 'ar' ? height * 0.38 : height * 0.29}px/1.15 'IBM Plex Sans Arabic','Noto Sans Arabic',var(--font-ui,sans-serif)`, color: ink }}>مكتسب</span>}
         </span>
       </span>
     </span>);
@@ -3599,7 +3602,7 @@ function PlatformApp() {
   const [auditFeed, setAuditFeed] = useState(null);
   const [needUpdate, setNeedUpdate] = useState(null);
   const [subLive, setSubLive] = useState('');
-  const [subDue, setSubDue] = useState(null);   // v51.8: تذكير التجديد لمسؤول المنشأة المشتركة (من خادم مِثقال)   // v51.7: حالة الاشتراك الفعلية من قاعدة المنشأة (platform/release.sub) — تظهر فور تغييرها من لوحة مِثقال
+  const [subDue, setSubDue] = useState(null);   // v51.8: تذكير التجديد لمسؤول المنشأة المشتركة (من خادم مُكتسَب)   // v51.7: حالة الاشتراك الفعلية من قاعدة المنشأة (platform/release.sub) — تظهر فور تغييرها من لوحة مُكتسَب
   const auditReader = !!me && (!!(ROLES[me.role] || {}).admin || roleHasTab(me, 'audit'));
   useEffect(() => { if (!me) return; let dead = false;
     const chk = async () => { const rel = (ROLES[me.role] || {}).admin ? ((await raiseRelease(me)) || (await loadRelease())) : await loadRelease();
@@ -4645,7 +4648,7 @@ function PlatformApp() {
         {drawer && <div className="mask" style={{ zIndex: 55 }} onClick={() => setDrawer(false)} />}
         <aside className={'side' + (drawer ? ' open' : '')}>
           <div className="brand">
-            {/* v47.2 (قرار المالك): شعار النظام «مِثقال» ثابت، وشعار الشركة يرافق اسمها */}
+            {/* v47.2 (قرار المالك): شعار النظام «مُكتسَب» ثابت، وشعار الشركة يرافق اسمها */}
             <div className="rp-mark">{BRAND_MARK()}</div>
             <div className="rp-brand">
               <span className="rp-lockup"><BrandLockup lang={isEn() ? 'en' : 'bi'} onDark height={46} /></span>
@@ -5132,7 +5135,7 @@ function TenantChip({ org, dark }) {
   </span>;
 }
 function BrandHead({ title, sub, logo }) {
-  // v47.2: العلامة أعلاه دائمًا شعار النظام «مِثقال»؛ شعار الشركة (logo) يظهر بجانب اسمها في العنوان
+  // v47.2: العلامة أعلاه دائمًا شعار النظام «مُكتسَب»؛ شعار الشركة (logo) يظهر بجانب اسمها في العنوان
   return (
     <div className="bhead" style={{ textAlign: 'center', marginBottom: 24 }}>
       <div className="bhead-logo mq-bhead" style={{ margin: '0 auto 14px', width: 'fit-content' }}><BrandLockup lang={isEn() ? 'en' : 'bi'} height={52} /></div>
@@ -7400,7 +7403,7 @@ const FA_R2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const FA_DIV = (a, b) => Math.abs(Number(b) || 0) < 0.005 ? null : a / b;
 const FA_SHIFT = (d, k, unit) => { const x = new Date(d + 'T00:00:00Z'); if (unit === 'y') x.setUTCFullYear(x.getUTCFullYear() + k); else x.setUTCDate(x.getUTCDate() + k); return x.toISOString().slice(0, 10); };
 const FA_DAYS = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000) + 1;
-/** تصنيف حسابات المركز المالي حسب دليل مثقال */
+/** تصنيف حسابات المركز المالي حسب دليل مُكتسَب */
 const FA_CLS = { cash: c => /^1[12]/.test(c), ar: c => /^13/.test(c), inv: c => /^160/.test(c), fixed: c => /^17/.test(c), curAsset: c => /^1/.test(c) && !/^17/.test(c) };
 /** لقطة مالية لفترة: المركز المالي في نهايتها وبدايتها + قائمة الدخل للفترة + التدفق التشغيلي (طريقة مباشرة تقريبية) */
 function faSnap(A, from, to, bf) {
@@ -7506,7 +7509,7 @@ function finAnalyze(org, ops, opts = {}, A0) {
       liabilities: S.B.liab.close, payables: S.B.ap.close, equity: S.B.eq.close, operatingCashFlow: S.ocf, balanced: !!S.T.balanced },
     ratios };
 }
-/* ===== v53.7 — مقترحات Claude (موصل MCP بكتابة مشروطة بالاعتماد): Claude يقترح، ومسؤول النظام يعتمد في مثقال فيُنفَّذ بالحفظ العادي =====
+/* ===== v53.7 — مقترحات Claude (موصل MCP بكتابة مشروطة بالاعتماد): Claude يقترح، ومسؤول النظام يعتمد في مُكتسَب فيُنفَّذ بالحفظ العادي =====
    الأنواع: journal (قيد يومية) · reclass (إعادة تصنيف حساب فواتير مصروفات) · expinv (فواتير مصروفات/مشتريات عبر مسار استيراد Excel نفسه).
    الدوال نقية: يستعملها الخادم للتحقق عند الاقتراح، والتطبيق عند الاعتماد على البيانات الحية — فالنتيجة واحدة. */
 const MCP_KINDS = { journal: 'قيد يومية', reclass: 'إعادة تصنيف فواتير', expinv: 'فواتير مصروفات ومشتريات' };
@@ -9980,7 +9983,7 @@ function buildClosingA4(c, org) {
         <div class="sig-ok dim">الاعتماد النهائي</div>
       </div>
     </div>
-    <div class="foot dim">تم تصدير هذا التقرير آلياً من مِثقال · ${co.name || ''}</div>
+    <div class="foot dim">تم تصدير هذا التقرير آلياً من مُكتسَب · ${co.name || ''}</div>
   </div>`;
 }
 
@@ -9995,19 +9998,19 @@ const docInApp = () => { try { return isStandaloneApp() || isIOSDev() || /Androi
    mzSvg: الشعار كنص SVG للمستندات المطبوعة (بلا اعتماد على CSS الصفحة).
    mzBrandDoc: يضيف توقيع «RESTAURANT PRO» بالشعار في تذييل كل مستند (أو سطرًا صغيرًا إن لم يوجد تذييل) — مرة واحدة فقط. */
 // v42.1: علامة RESTAURANT PRO في المطبوعات — مربع كحلي بحرفَي RP الذهبيين (المعامِلات القديمة مقبولة للتوافق)
-// v50.3: أُزيل رمز مِثقال القديم من المطبوعات (mzSvg) — المطبوعات بشعار المنشأة فقط
-// v50.3 (قرار المالك 2026-11-19): المطبوعات تحمل شعار المنشأة (الطيف) فقط — لا شعار لمِثقال مكانه إن لم يُرفع شعار المنشأة
+// v50.3: أُزيل رمز مُكتسَب القديم من المطبوعات (mzSvg) — المطبوعات بشعار المنشأة فقط
+// v50.3 (قرار المالك 2026-11-19): المطبوعات تحمل شعار المنشأة (الطيف) فقط — لا شعار لمُكتسَب مكانه إن لم يُرفع شعار المنشأة
 const MZ_LOGO_HTML = '';
 const mzBrandDoc = (html) => {
   html = String(html || '');
   if (html.includes('data-mzb')) return html;
-  const sig = '<span data-mzb style="white-space:nowrap">مِثقال</span>';   // v50.3: نص فقط بلا شعار — الشعار في المطبوعات للمنشأة وحدها
+  const sig = '<span data-mzb style="white-space:nowrap">مُكتسَب</span>';   // v50.3: نص فقط بلا شعار — الشعار في المطبوعات للمنشأة وحدها
   const bi = html.search(/<body[^>]*>/i);
   if (bi < 0) return html;
   const head = html.slice(0, bi), body = html.slice(bi);
   // RESTAURANT PRO: الاسم السابق — يُستبدل أيضًا في القوالب المحفوظة القديمة
-  if (/مِثقال|RESTAURANT PRO/.test(body)) return head + body.replace(/مِثقال|RESTAURANT PRO/g, sig);
-  const foot = '<div data-mzb style="text-align:center;font-size:9px;color:#888;margin-top:10px">مِثقال — Mithqal</div>';
+  if (/مُكتسَب|RESTAURANT PRO/.test(body)) return head + body.replace(/مُكتسَب|RESTAURANT PRO/g, sig);
+  const foot = '<div data-mzb style="text-align:center;font-size:9px;color:#888;margin-top:10px">مُكتسَب — Muktasab</div>';
   return /<\/body>/i.test(body) ? head + body.replace(/<\/body>/i, foot + '</body>') : head + body + foot;
 };
 // v51.6: شريط العارض (إغلاق، طباعة، Excel، CSV) لا يُطبع أبدًا
@@ -10267,7 +10270,7 @@ function printPartnerStatement(p, org) {
   <table><thead><tr><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
   <tbody>${rows || '<tr><td colspan=5 style="text-align:center;color:#999;padding:20px">لا حركات</td></tr>'}</tbody>
   <tfoot><tr><td colspan="2">الإجماليات</td><td class="n">${money(sdr)}</td><td class="n">${money(scr)}</td><td class="n">${money(Math.abs(bal))}${bal > 0 ? ' دائن' : bal < 0 ? ' مدين' : ''}</td></tr></tfoot></table>
-  <div class="ft">كشف حساب صادر من مِثقال — ${co.name || ''} · ${arDate(today())}</div></body></html>`);
+  <div class="ft">كشف حساب صادر من مُكتسَب — ${co.name || ''} · ${arDate(today())}</div></body></html>`);
   w.document.close();
   setTimeout(() => { w.focus(); w.print(); }, 400);
   return true;
@@ -10279,7 +10282,7 @@ function printPartnerStatement(p, org) {
 const _rptCtx = { user: '' };
 function rptShell(org, title, sub, bodyHtml, opt = {}) {
   const co = (org && org.company) || {}, en = opt.lang === 'en', B = tenantBrand(org, { lang: opt.lang, branchId: opt.branchId }), paper = ['A4', 'A3', 'Letter'].includes(opt.paper) ? opt.paper : B.print.paper, orient = opt.orientation === 'landscape' ? 'landscape' : 'portrait';
-  const foot = (en ? 'Issued from Mithqal ' : 'صادر من مِثقال ') + APP_VER + ' · ' + (en ? 'Printed by ' : 'طبعه: ') + (_rptCtx.user || '—') + ' · ' + dtLocal(new Date());
+  const foot = (en ? 'Issued from Muktasab ' : 'صادر من مُكتسَب ') + APP_VER + ' · ' + (en ? 'Printed by ' : 'طبعه: ') + (_rptCtx.user || '—') + ' · ' + dtLocal(new Date());
   return `<!doctype html><html dir="${en ? 'ltr' : 'rtl'}" lang="${en ? 'en' : 'ar'}"><head><meta charset="utf-8"><title>${_xe(title)}</title>
   <style>@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap');${NUM_FACE}${tbCss(B, { mono: opt.mono })}@page{size:${paper} ${orient};margin:14mm 10mm 16mm;@bottom-center{content:"${en ? 'Page ' : 'صفحة '}" counter(page) "${en ? ' of ' : ' من '}" counter(pages);font-size:9px;color:#777}@bottom-${en ? 'left' : 'right'}{content:"${foot.replace(/"/g, "'")}";font-size:8px;color:#888}}
   *{font-family:'MizanNum','IBM Plex Sans Arabic','Noto Sans Arabic','Segoe UI',Tahoma,sans-serif;box-sizing:border-box}body{margin:0;color:var(--tb-t);font-size:12px}
@@ -12398,7 +12401,7 @@ function morningText(org, D) {
   if (D.pay && (D.pay.over.length || D.pay.soon.length)) { L.push(''); L.push('🧾 الموردون: متأخر ' + money(D.pay.overT) + ' (' + D.pay.over.length + ') · مستحق خلال 7 أيام ' + money(D.pay.soonT) + ' (' + D.pay.soon.length + ')'); }
   if (D.food && D.food.all.pct != null) { L.push(''); L.push('🍽️ تكلفة الطعام للشهر: ' + D.food.all.pct + '% (الهدف ' + D.food.tgt + '%)' + (D.food.over.length ? ' · فوق الهدف: ' + D.food.over.map(x => x.b.name + ' ' + x.pct + '%').join('، ') : '')); }
   if (D.vat2302 != null && D.vat2302 > 0.004) { L.push(''); L.push('🏛️ ضريبة مستحقة غير مسددة: ' + money(D.vat2302)); }
-  L.push(''); L.push('— مِثقال');
+  L.push(''); L.push('— مُكتسَب');
   return L.join('\n');
 }
 function morningHtml(org, D) {
@@ -12429,7 +12432,7 @@ function morningHtml(org, D) {
       ${D.patterns.map(x => `<div class="note" style="background:#fdeeed;color:#C0392B">عجز متكرر — ${x.branchName}: ${x.n} حالات خلال ${D.dcf.days} أيام بإجمالي ${money(Math.abs(x.total))}</div>`).join('')}` : ''}
     ${payT}${foodT}
     ${D.vat2302 != null && D.vat2302 > 0.004 ? `<div class="note">ضريبة القيمة المضافة المستحقة غير المسددة (2302): ${money(D.vat2302)}</div>` : ''}
-    <div class="foot dim" style="margin-top:14px;text-align:center;font-size:9.5px">تقرير آلي من مِثقال — الأرقام من الإغلاقات والقيود الفعلية</div>
+    <div class="foot dim" style="margin-top:14px;text-align:center;font-size:9.5px">تقرير آلي من مُكتسَب — الأرقام من الإغلاقات والقيود الفعلية</div>
   </div></body></html>`;
 }
 function MorningBrief({ org, ops, me, myBranches, scoped, setTab, onClose }) {

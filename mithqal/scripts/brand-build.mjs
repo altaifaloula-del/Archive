@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * v56.0 — مولّد ملفات هوية MITHQAL ERP (أمر التصميم v56.0، القسم الثاني).
+ * v56.0 (إعادة التسمية) — مولّد ملفات هوية «مُكتسَب — Muktasab» (رمز البوصلة، قرار المالك 2026-11-25؛ كان مولّد MITHQAL ERP في v56.0).
  * مصدر واحد للحقيقة: هندسة الرمز أدناه (شبكة 100×100) + حروف الاسم محوّلة لمسارات من الخطوط الرسمية.
  * يُنتج: SVG نظيفة (بلا نص حي ولا تدرجات ولا ظلال)، PDF متجهية، PNG شفافة، Favicon (ICO+SVG)، أيقونات التطبيق، والتوكنات.
  *
@@ -26,10 +26,13 @@ import { MQ_GEOM, mqSymbolShapes } from '../brand-geom.js';
 export const GEOM = MQ_GEOM;
 export const symbolShapes = mqSymbolShapes;
 const pts = (p, dx = 0, dy = 0, s = 1) => p.map(([x, y]) => (+(dx + x * s).toFixed(3)) + ',' + (+(dy + y * s).toFixed(3))).join(' ');
-/** الرمز كعناصر SVG — c = { outer, inner } */
+/** الرمز كعناصر SVG — c = { outer, inner } — البوصلة: رؤوس قطرية خفيفة + ثلاثة رؤوس بلون outer + الرأس الشمالي بلون inner، ومركز مفرّغ بقناع */
 export function symbolSvg(c, dx = 0, dy = 0, s = 1) {
-  const S = symbolShapes();
-  return [...S.outer.map(p => `<polygon points="${pts(p, dx, dy, s)}" fill="${c.outer}"/>`), ...S.inner.map(p => `<polygon points="${pts(p, dx, dy, s)}" fill="${c.inner}"/>`)].join('');
+  const S = symbolShapes(), id = 'mk-hole'   /* معرّف ثابت: كل ملف SVG يحمل رمزًا واحدًا، فتبقى الملفات متطابقة بين التوليدات */, h = S.hole;
+  return `<g transform="translate(${+dx.toFixed(3)} ${+dy.toFixed(3)}) scale(${+s.toFixed(4)})"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><rect width="100" height="100" fill="#fff"/><circle cx="${h.cx}" cy="${h.cy}" r="${h.r}" fill="#000"/></mask></defs><g mask="url(#${id})">`
+    + S.minor.map(p => `<polygon points="${pts(p)}" fill="${c.outer}" fill-opacity="${S.minorOpacity}"/>`).join('')
+    + S.outer.map(p => `<polygon points="${pts(p)}" fill="${c.outer}"/>`).join('')
+    + S.inner.map(p => `<polygon points="${pts(p)}" fill="${c.inner}"/>`).join('') + '</g></g>';
 }
 
 /* ======================= الحروف كمسارات ======================= */
@@ -57,11 +60,11 @@ const round = (d) => d.replace(/-?\d+\.\d+/g, n => String(+(+n).toFixed(2)));
 /* ======================= التكوينات ======================= */
 const AR_FEATS = ['ccmp', 'isol', 'init', 'medi', 'fina', 'rlig', 'calt', 'liga', 'kern', 'mark', 'mkmk'];
 function lockups(F) {
-  const ar = textPath(F.ar, 'مثقال', 62, 0, AR_FEATS);
-  const en = textPath(F.en, 'MITHQAL', 25, 0.16, ['kern']);
+  const ar = textPath(F.ar, 'مكتسب', 62, 0, AR_FEATS);
+  const en = textPath(F.en, 'MUKTASAB', 25, 0.16, ['kern']);
   const clear = 20;   // مساحة الحماية = 20% من عرض الرمز (الرمز 100)
   // أفقي: الرمز ثم كتلة الاسم — أحجام من حدود الحروف المقاسة لا تقديرًا: العربي أعلى، فراغ ثابت، الإنجليزي أسفل؛ الكتلة متمركزة على الرمز
-  const arH = textPath(F.ar, 'مثقال', 50, 0, AR_FEATS), enH = textPath(F.en, 'MITHQAL', 17, 0.2, ['kern']);
+  const arH = textPath(F.ar, 'مكتسب', 50, 0, AR_FEATS), enH = textPath(F.en, 'MUKTASAB', 17, 0.2, ['kern']);
   const hx = 100 + 24, blockW = Math.max(arH.w, enH.w), hGap = 9;
   const bh = (arH.bottom - arH.top) + hGap + (enH.bottom - enH.top), b0 = 50 - bh / 2;
   const arY = b0 - arH.top, enY = b0 + (arH.bottom - arH.top) + hGap - enH.top;
@@ -76,8 +79,8 @@ function lockups(F) {
 }
 const svgDoc = (L, c, clear, bg) => {
   const w = L.w + 2 * clear, h = L.h + 2 * clear;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${+w.toFixed(2)} ${+h.toFixed(2)}" width="${Math.round(w * 4)}" height="${Math.round(h * 4)}" role="img" aria-label="MITHQAL ERP — مثقال">`
-    + `<title>MITHQAL ERP — مثقال</title>${bg ? `<rect width="100%" height="100%" fill="${bg}"/>` : ''}<g transform="translate(${clear} ${clear})">${L.parts(c)}</g></svg>\n`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${+w.toFixed(2)} ${+h.toFixed(2)}" width="${Math.round(w * 4)}" height="${Math.round(h * 4)}" role="img" aria-label="Muktasab — مكتسب">`
+    + `<title>Muktasab — مكتسب</title>${bg ? `<rect width="100%" height="100%" fill="${bg}"/>` : ''}<g transform="translate(${clear} ${clear})">${L.parts(c)}</g></svg>\n`;
 };
 
 /* ======================= النسخ اللونية ======================= */
@@ -90,9 +93,9 @@ export const VARIANTS = {
   gold: { outer: BRAND.gold, inner: BRAND.gold, text: BRAND.gold },
 };
 /** أيقونة التطبيق: مربع كحلي (حواف حسب المنصة) والرمز المعكوس داخل منطقة آمنة 60% */
-const appIcon = (radius) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><title>MITHQAL ERP</title>`
+const appIcon = (radius) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><title>Muktasab</title>`
   + `<rect width="512" height="512" rx="${radius}" fill="${BRAND.navy}"/>${symbolSvg(VARIANTS.reverse, 102.4, 102.4, 3.072)}</svg>\n`;
-const faviconSvg = () => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><title>MITHQAL ERP</title>`
+const faviconSvg = () => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><title>Muktasab</title>`
   + `<rect width="64" height="64" rx="12" fill="${BRAND.navy}"/>${symbolSvg(VARIANTS.reverse, 6, 6, 0.52)}</svg>\n`;
 
 /** ICO بصور PNG مضمنة (مدعوم في كل المتصفحات الحديثة) */
@@ -118,8 +121,8 @@ async function main() {
     ['white', 'horizontal', 'white'], ['white', 'stacked', 'white'], ['white', 'symbol', 'white'],
   ];
   const files = {};
-  for (const [dir, kind, v] of plan) { const name = `mithqal-${kind}-${v}`; const svg = svgDoc(L[kind], VARIANTS[v], L.clear); made.push(out(`${B}/${dir}/${name}.svg`, svg)); files[`${dir}/${name}`] = svg; }
-  made.push(out(`${B}/app-icon/mithqal-app-icon.svg`, appIcon(112)), out(`${B}/app-icon/mithqal-app-icon-maskable.svg`, appIcon(0)), out(`${B}/favicon/mithqal-favicon.svg`, faviconSvg()));
+  for (const [dir, kind, v] of plan) { const name = `muktasab-${kind}-${v}`; const svg = svgDoc(L[kind], VARIANTS[v], L.clear); made.push(out(`${B}/${dir}/${name}.svg`, svg)); files[`${dir}/${name}`] = svg; }
+  made.push(out(`${B}/app-icon/muktasab-app-icon.svg`, appIcon(112)), out(`${B}/app-icon/muktasab-app-icon-maskable.svg`, appIcon(0)), out(`${B}/favicon/muktasab-favicon.svg`, faviconSvg()));
 
   // الخطوط الرسمية (OFL) للاستعمال في التصميم — نفس ملفات الحزم
   out('brand/fonts/IBMPlexSansArabic-Bold.woff2', F.arFile); out('brand/fonts/Manrope-ExtraBold.woff2', F.enFile);
@@ -129,17 +132,17 @@ async function main() {
   const tokens = { color: { navy: BRAND.navy, gold: BRAND.gold, deepNavy: BRAND.deepNavy, blue: BRAND.blue, lightGray: BRAND.lightGray, white: BRAND.white },
     font: { arabic: "'IBM Plex Sans Arabic', 'Noto Sans Arabic', system-ui, sans-serif", latin: "Manrope, 'Segoe UI', system-ui, sans-serif", numeric: "'MizanNum', 'IBM Plex Mono', ui-monospace, monospace" },
     logo: { geometry: GEOM, clearSpacePct: 20, minSizePx: { symbol: 16, horizontal: 96, stacked: 64 } } };
-  out('brand/tokens/mithqal-tokens.json', JSON.stringify(tokens, null, 2) + '\n');
+  out('brand/tokens/muktasab-tokens.json', JSON.stringify(tokens, null, 2) + '\n');
   const css = ':root {\n' + Object.entries({ navy: BRAND.navy, gold: BRAND.gold, 'deep-navy': BRAND.deepNavy, 'tech-blue': BRAND.blue, white: BRAND.white, 'soft-gray': BRAND.lightGray })
     .map(([k, v]) => `  --mithqal-${k}: ${v};`).join('\n') + '\n}\n';
-  out('brand/tokens/mithqal-tokens.css', css); out('brand/mithqal-brand-tokens.css', css);
+  out('brand/tokens/muktasab-tokens.css', css); out('brand/mithqal-brand-tokens.css', css);
 
   // نسخ الواجهة (المستعملة في التطبيق)
-  out('public/brand/mithqal-symbol.svg', files['symbol/mithqal-symbol-primary']);
-  out('public/brand/mithqal-symbol-reverse.svg', files['symbol/mithqal-symbol-reverse']);
-  out('public/brand/mithqal-logo-horizontal-bilingual.svg', files['horizontal/mithqal-horizontal-primary']);
-  out('public/brand/mithqal-logo-horizontal-reverse.svg', files['horizontal/mithqal-horizontal-reverse']);
-  out('public/brand/mithqal-logo-stacked.svg', files['stacked/mithqal-stacked-primary']);
+  out('public/brand/mithqal-symbol.svg', files['symbol/muktasab-symbol-primary']);
+  out('public/brand/mithqal-symbol-reverse.svg', files['symbol/muktasab-symbol-reverse']);
+  out('public/brand/mithqal-logo-horizontal-bilingual.svg', files['horizontal/muktasab-horizontal-primary']);
+  out('public/brand/mithqal-logo-horizontal-reverse.svg', files['horizontal/muktasab-horizontal-reverse']);
+  out('public/brand/mithqal-logo-stacked.svg', files['stacked/muktasab-stacked-primary']);
   out('public/brand/mithqal-app-icon.svg', appIcon(112)); out('public/icon.svg', appIcon(112)); out('public/brand/mithqal-favicon.svg', faviconSvg());
 
   // PNG وPDF عبر Chromium (متجه حقيقي في PDF)
@@ -150,16 +153,18 @@ async function main() {
     const buf = await p.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: w, height: h } }); if (file) out(file, buf); return buf; };
   const dims = (svg) => { const m = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svg); return [+m[1], +m[2]]; };
   for (const [k, svg] of Object.entries(files)) { const [w, h] = dims(svg); const sc = 2048 / Math.max(w, h); await png(svg, Math.round(w * sc), Math.round(h * sc), `${B}/${k}.png`); }
-  for (const k of ['primary/mithqal-horizontal-primary', 'primary/mithqal-stacked-primary', 'primary/mithqal-symbol-primary', 'monochrome/mithqal-horizontal-black', 'white/mithqal-horizontal-white']) {
+  for (const k of ['primary/muktasab-horizontal-primary', 'primary/muktasab-stacked-primary', 'primary/muktasab-symbol-primary', 'monochrome/muktasab-horizontal-black', 'white/muktasab-horizontal-white']) {
     const svg = files[k]; const [w, h] = dims(svg); const mm = 0.75;   // 1 وحدة = 0.75 مم
     await p.setContent(`<html><head><style>@page{size:${(w * mm).toFixed(1)}mm ${(h * mm).toFixed(1)}mm;margin:0}html,body{margin:0}</style></head><body${k.startsWith('white') ? ' style="background:#10294A"' : ''}>${svg.replace(/ width="[^"]*" height="[^"]*"/, ` width="${(w * mm).toFixed(1)}mm" height="${(h * mm).toFixed(1)}mm"`)}</body></html>`);
     out(`${B}/${k}.pdf`, await p.pdf({ width: (w * mm).toFixed(1) + 'mm', height: (h * mm).toFixed(1) + 'mm', printBackground: k.startsWith('white'), pageRanges: '1' }));
   }
   // أيقونات التطبيق والمتصفح
   const icon = appIcon(112), mask = appIcon(0), fav = faviconSvg();
-  for (const [s, f] of [[512, 'public/mithqal-512.png'], [192, 'public/mithqal-192.png'], [180, 'public/mithqal-apple-180.png'], [192, 'public/icon-192.png'], [512, 'public/icon-512.png'], [180, 'public/apple-touch-icon.png'], [1024, `${B}/app-icon/mithqal-app-icon-1024.png`], [512, `${B}/app-icon/mithqal-app-icon-512.png`]]) await png(icon, s, s, f);
-  for (const [s, f] of [[512, 'public/mithqal-maskable-512.png'], [192, 'public/mithqal-maskable-192.png'], [512, `${B}/app-icon/mithqal-app-icon-maskable-512.png`]]) await png(mask, s, s, f);
-  const icoPngs = []; for (const s of [16, 32, 48]) { const buf = await png(fav, s, s, `${B}/favicon/mithqal-favicon-${s}.png`); icoPngs.push([s, buf]); }
+  for (const [s, f] of [[512, 'public/mithqal-512.png'], [192, 'public/mithqal-192.png'], [180, 'public/mithqal-apple-180.png'], [192, 'public/icon-192.png'], [512, 'public/icon-512.png'], [180, 'public/apple-touch-icon.png'], [1024, `${B}/app-icon/muktasab-app-icon-1024.png`], [512, `${B}/app-icon/muktasab-app-icon-512.png`]]) await png(icon, s, s, f);
+  for (const [s, f] of [[512, 'public/mithqal-maskable-512.png'], [192, 'public/mithqal-maskable-192.png'], [512, `${B}/app-icon/muktasab-app-icon-maskable-512.png`]]) await png(mask, s, s, f);
+  const icoPngs = []; for (const s of [16, 32, 48]) { const buf = await png(fav, s, s, `${B}/favicon/muktasab-favicon-${s}.png`); icoPngs.push([s, buf]); }
+  // شارة إشعارات الدفع (أحادية بيضاء على شفاف كما تتطلب أنظمة التشغيل)
+  await png(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${symbolSvg(VARIANTS.white, 0, 0, 1)}</svg>`, 96, 96, 'public/mithqal-badge-96.png');
   out('public/favicon.ico', ico(icoPngs)); out(`${B}/favicon/favicon.ico`, ico(icoPngs));
   await b.close();
   console.log('✓ brand assets:', made.length, 'SVG + PNG/PDF/ICO →', B);

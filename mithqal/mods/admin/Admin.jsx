@@ -10,7 +10,7 @@ import { EDIT_KINDS, editPermOf, ALL_TABS, AppPermsPanel, BranchForm, Categories
 
 export function Admin({ org, ops, me, commit, commitOrg, say }) {
   const [tab, setTab] = useState('branches');
-  // v51.5 (S6): «لوحة مِثقال» تظهر لمزوّد المنصة فقط — الخادم يقرر (والمسارات تفحصه من جديد)
+  // v51.5 (S6): «لوحة مُكتسَب» تظهر لمزوّد المنصة فقط — الخادم يقرر (والمسارات تفحصه من جديد)
   const [isProv, setIsProv] = useState(false);
   useEffect(() => { let on = true; if (TENANT.id === 'default' && authApi.enabled) probeProvider().then(v => { if (on) setIsProv(v); }); return () => { on = false; }; }, []);
   const [bEdit, setBEdit] = useState(null);
@@ -143,7 +143,7 @@ export function Admin({ org, ops, me, commit, commitOrg, say }) {
         </button>
         {me && me.role === 'system_admin' && <button className={'btn sm' + (tab === 'claude' ? ' pri' : ' gh')} data-tab-claude onClick={() => setTab('claude')}><Link2 size={14} />ربط Claude</button>}
         {isProv && <button className={'btn sm mq-prov-tab' + (tab === 'provider' ? ' pri' : ' gh')} onClick={() => setTab('provider')}>
-          <Store size={14} />لوحة مِثقال
+          <Store size={14} />لوحة مُكتسَب
         </button>}
         {(tab === 'branches' || tab === 'users') && <button className="btn pri" style={{ marginInlineStart: 'auto' }}
           onClick={() => tab === 'branches'
