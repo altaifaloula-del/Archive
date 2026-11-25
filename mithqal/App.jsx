@@ -3530,7 +3530,8 @@ export { jeLive, jeOwner, canApproveJe, jeAutoSt, vatCloseLive, WF_DOCS, wfTiers
 export { gosiNewSched, gosiNewAuto };   // v47.2 الرواتب   // v46.8 مرتجع نقطة البيع   // v46.8: للاختبارات الوظيفية (حارس الإقفال)
 export { findDupClosings, clDayKey, clrKeyId, yearEndDates, yearEndNext, payFactor, POS_HOLD_MAX, posHolds, posHoldsSet, posHoldPut, posHoldRecall };
 export { rptPivot, rptTpl, RPT_TPL_ALIAS };
-export { salesInvoiceHtml };
+export { tnRemember, tnHref, tnOkId };
+export { salesInvoiceHtml, gsearch, gsNorm, kbAction, KB_SHORTCUTS, GlobalSearch };
 export { TB_NEUTRAL, TB_TPL_INV, TB_TPL_RPT, TB_PAPER, TB_IMG_MAX, tbNorm, tenantBrand, tbCss, tbHeadHtml, tbLogo, tbImg };   // v56.0 هوية المنشأة   // v56.0 (GAP-002) الحارس المركزي لتكرار الإغلاق
 if (typeof window !== 'undefined' && !window.__mizanErrHook) {
   window.__mizanErrHook = true;
@@ -3626,6 +3627,7 @@ function PlatformApp() {
   const [, setI18nTick] = useState(0);   // v50.2: إعادة رسم عند وصول حزمة الترجمة الكاملة
   useEffect(() => { const f = () => setI18nTick(t => t + 1); window.addEventListener('mz-i18n', f); return () => window.removeEventListener('mz-i18n', f); }, []);
   const toggleLang = () => setLang(l => { const n = l === 'en' ? 'ar' : 'en'; setLangGlobal(n); return n; });
+  const [gsOpen, setGsOpen] = useState(false), [gsHelp, setGsHelp] = useState(false);   // v56.0 البحث العام والاختصارات
   const toggleSide = () => setSideCol(v => { const n = !v; try { localStorage.setItem('rms8:sideCol', n ? '1' : '0'); } catch { } return n; });
   const [mode, setMode] = useState(() => { try { return localStorage.getItem('rms8:mode') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; } });
   const [tour, setTour] = useState(false);
@@ -4708,6 +4710,10 @@ function PlatformApp() {
             )}
             <span className="toplogo-mark rp-mark" style={{ width: 30, height: 30, fontSize: 15 }}>{BRAND_MARK()}</span>
             <h1 className="toptitle">{safeTab === 'home' ? TX('الرئيسية') : TX(HR_TABS.includes(safeTab) ? 'الموارد البشرية' : (NAV.find(n => n.id === safeTab)?.ar || TAB_AR[safeTab] || ''))}</h1>
+            <button className="btn sm gh gs-btn" onClick={() => { setGsHelp(false); setGsOpen(true); }} title={TX('البحث العام') + ' (Ctrl+K)'} aria-label={TX('البحث العام')} data-gs-open><Search size={16} /><span className="gs-hint">{TX('بحث')}<kbd>Ctrl K</kbd></span></button>
+            <GlobalSearch open={gsOpen} help={gsHelp} onClose={() => setGsOpen(false)} org={org} ops={scoped} allowed={allowedTabs} screens={NAV.map(n => ({ id: n.id, label: TX(n.ar) }))} setTab={setTab} />
+            <KbShortcuts onAction={(a) => { if (a === 'search') { setGsHelp(false); setGsOpen(true); } else if (a === 'help') { setGsHelp(true); setGsOpen(true); } else if (a === 'home') setTab('home'); else if (a === 'back') goBackTab(); else if (a === 'side') toggleSide(); else if (a === 'lang') toggleLang();
+              else if (a === 'mode') { const mv = mode === 'dark' ? 'light' : 'dark'; setMode(mv); try { localStorage.setItem('rms8:mode', mv); } catch { } } }} />
             <TenantChip org={org} dark={mode === 'dark'} />
             <span className="verbadge" style={{ fontSize: 11, color: 'var(--mithqal-navy,#10294A)', background: 'var(--mint)', fontFamily: 'monospace', flexShrink: 0, padding: '3px 8px', borderRadius: 6, fontWeight: 700, alignSelf: 'center' }}>{APP_VER}</span>
             <div className="topstatus">
@@ -5019,12 +5025,108 @@ const GateCover = () => (
   <div className="gate-cover mq-cover" role="img" aria-label={TX(BRAND_AR) + ' — ' + TX(BRAND_SUB)}>
     <div className="mq-cover-in"><BrandLockup lang="bi" height={86} /><div className="mq-cover-sub" dir="auto">{TX(BRAND_SUB)}</div></div>
   </div>);
-/* v56.0 — موضع هوية المنشأة في الشريط العلوي: شعارها (البديل في الوضع الداكن) واسمها بلونها — منفصل عن رمز MITHQAL الثابت */
+/* ============================================================
+   v56.0 — البحث العام (الشريط العلوي، Ctrl/⌘+K أو «/»)
+   يبحث في الشاشات المسموحة للمستخدم، وفي السجلات التي يملك شاشتها فقط (الصلاحية = التبويب نفسه):
+   فواتير الموردين، فواتير المبيعات، السندات، القيود اليدوية، الإغلاقات، جهات الاتصال، الموظفين، الأصناف والمنتجات.
+   النتيجة تفتح المستند في نافذة الاستعراض (peekDoc) أو تنتقل لشاشته. لا يقرأ إلا ما في يد الجلسة (scoped). دالة نقية.
+   ============================================================ */
+const gsNorm = (v) => normDigits(String(v == null ? '' : v)).toLowerCase().replace(/[ً-ٰٟـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim();
+const GS_KIND = { screen: 'شاشة', pinv: 'فاتورة مورد', sinv: 'فاتورة مبيعات', cv: 'سند', je: 'قيد', closing: 'إغلاق', party: 'جهة', emp: 'موظف', item: 'صنف', prod: 'منتج' };
+function gsearch(org, ops, allowed, screens, q, max = 30) {
+  const Q = gsNorm(q); if (Q.length < 2) return [];
+  const can = (...t) => t.some(x => (allowed || []).includes(x));
+  const out = [];
+  const add = (kind, label, sub, go, hay) => { const H = gsNorm([label, sub, hay].filter(Boolean).join(' ')); const i = H.indexOf(Q); if (i < 0) return;
+    out.push({ kind, label: String(label || ''), sub: String(sub || ''), go, score: (gsNorm(label).startsWith(Q) ? 0 : gsNorm(label).includes(Q) ? 1 : 2) }); };
+  (screens || []).filter(x => (allowed || []).includes(x.id)).forEach(x => add('screen', x.label, '', { tab: x.id }));
+  const O = ops || {}, G = org || {};
+  if (can('purchasing', 'acct')) (O.invoices || []).forEach(i => add('pinv', (i.invoiceNo || '—') + ' — ' + (i.supplierName || ''), (i.date || '') + ' · ' + money(Math.abs(i.amount || 0)), { peek: { inv: i.id }, tab: 'purchasing' }));
+  if (can('sales', 'acct')) (O.salesInvoices || []).forEach(x => add('sinv', (x.no || '—') + ' — ' + ((x.buyer || {}).name || ''), (x.date || '') + ' · ' + money(x.total || 0), { peek: { si: x.id }, tab: 'sales' }));
+  if (can('acct', 'treasury')) (O.cashVouchers || []).forEach(v => add('cv', (v.no || '—') + (v.note ? ' — ' + v.note : ''), (v.date || '') + ' · ' + money(v.amount || 0), { peek: { cv: v.id }, tab: 'acct' }, v.party || v.partyName));
+  if (can('acct')) (O.journalManual || []).forEach(j => add('je', j.title || 'قيد يدوي', (j.date || '') + (j.no ? ' · ' + j.no : ''), { peek: { e: 'man:' + j.id }, tab: 'acct' }, j.no));
+  if (can('closing', 'approve')) (O.closings || []).forEach(c => add('closing', (c.closingNo || c.transferReferenceNo || c.id) + ' — ' + (c.branchName || ''), (c.date || '') + ' · ' + money(c.totalRevenue || 0), { tab: 'closing' }, c.date));
+  if (can('partners', 'purchasing')) [...(G.suppliers || []), ...(G.partners || []), ...(G.customAccounts || [])].forEach(x => x && x.name && add('party', x.name, x.code || x.phone || '', { tab: 'partners' }, [x.code, x.phone, x.taxNumber].join(' ')));
+  if (can('people')) (G.employees || []).forEach(e => e && e.name && add('emp', e.name, e.jobTitle || e.code || '', { tab: 'people' }, e.code));
+  if (can('inv')) { (G.items || []).forEach(x => x && x.name && add('item', x.name, x.unit || '', { tab: 'inv' }, x.code || x.barcode)); (G.products || []).forEach(x => x && x.name && add('prod', x.name, money(x.sellPrice || 0), { tab: 'inv' }, x.barcode)); }
+  return out.sort((a, b) => a.score - b.score || (a.kind === 'screen' ? -1 : 0) - (b.kind === 'screen' ? -1 : 0)).slice(0, max);
+}
+/* v56.0 — اختصارات لوحة المفاتيح (لا تعمل أثناء الكتابة في حقل، عدا Ctrl/⌘+K وEscape) */
+const KB_SHORTCUTS = [['Ctrl/⌘ + K', 'البحث العام'], ['/', 'البحث العام'], ['?', 'قائمة الاختصارات'], ['Alt + H', 'الرئيسية'], ['Alt + B', 'رجوع للشاشة السابقة'],
+  ['Alt + M', 'طي/توسيع القائمة الجانبية'], ['Alt + D', 'الوضع الفاتح/الداكن'], ['Alt + L', 'العربية/الإنجليزية'], ['Esc', 'إغلاق النافذة']];
+const kbTyping = (el) => !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName || ''));
+/** يحوّل حدث لوحة المفاتيح إلى أمر (دالة نقية قابلة للاختبار) — '' إن لم يكن اختصارًا */
+function kbAction(e) {
+  const k = String(e.key || '').toLowerCase(), code = String(e.code || '');
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && k === 'k') return 'search';
+  if (kbTyping(e.target)) return '';
+  if (e.altKey && !e.ctrlKey && !e.metaKey) return ({ KeyH: 'home', KeyB: 'back', KeyM: 'side', KeyD: 'mode', KeyL: 'lang' })[code] || '';
+  if (e.ctrlKey || e.metaKey || e.altKey) return '';
+  if (k === '/') return 'search';
+  if (k === '?') return 'help';
+  return '';
+}
+function KbShortcuts({ onAction }) {
+  const ref = useRef(onAction); ref.current = onAction;
+  useEffect(() => { const h = (e) => { const a = kbAction(e); if (!a) return; e.preventDefault(); ref.current(a); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, []);
+  return null;
+}
+function GlobalSearch({ open, onClose, org, ops, allowed, screens, setTab, help }) {
+  const [q, setQ] = useState(''); const [i, setI] = useState(0); const inp = useRef(null);
+  useEffect(() => { if (open) { setQ(''); setI(0); setTimeout(() => inp.current && inp.current.focus(), 20); } }, [open]);
+  const R = useMemo(() => open && !help ? gsearch(org, ops, allowed, screens, q) : [], [open, help, org, ops, allowed, screens, q]);
+  if (!open) return null;
+  const go = (r) => { if (!r) return; onClose(); if (r.go.tab) setTab(r.go.tab); if (r.go.peek) setTimeout(() => peekDoc(r.go.peek), 60); };
+  const key = (e) => { if (e.key === 'Escape') onClose(); else if (e.key === 'ArrowDown') { e.preventDefault(); setI(x => Math.min(R.length - 1, x + 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setI(x => Math.max(0, x - 1)); } else if (e.key === 'Enter') go(R[i]); };
+  return createPortal(<div className="gs-back" onMouseDown={onClose} data-gsearch>
+    <div className="gs-box" role="dialog" aria-modal="true" aria-label={help ? 'اختصارات لوحة المفاتيح' : 'البحث العام'} onMouseDown={e => e.stopPropagation()}>
+      {help ? <><div className="gs-h">اختصارات لوحة المفاتيح</div>
+        <table className="gs-kb" data-kbhelp><tbody>{KB_SHORTCUTS.map(([k, t]) => <tr key={k + t}><td><kbd>{k}</kbd></td><td>{t}</td></tr>)}</tbody></table>
+        <button className="btn sm gh" onClick={onClose} style={{ marginTop: 8 }}>إغلاق</button></>
+      : <><input ref={inp} className="inp gs-in" value={q} onChange={e => { setQ(e.target.value); setI(0); }} onKeyDown={key} placeholder="ابحث عن شاشة، فاتورة، قيد، إغلاق، مورد، موظف، صنف…" aria-label="البحث العام" data-gs-input />
+        <div className="gs-list" role="listbox">{q.trim().length < 2 ? <div className="gs-empty">اكتب حرفين على الأقل · ↑↓ للتنقل · Enter للفتح · Esc للإغلاق</div>
+          : !R.length ? <div className="gs-empty" data-gs-none>لا نتائج ضمن صلاحياتك</div>
+          : R.map((r, k) => <button key={k} type="button" role="option" aria-selected={k === i} className={'gs-r' + (k === i ? ' on' : '')} onMouseEnter={() => setI(k)} onClick={() => go(r)} data-gs-kind={r.kind}>
+            <span className="gs-k">{GS_KIND[r.kind]}</span><span className="gs-l">{r.label}</span>{r.sub && <span className="gs-s num">{r.sub}</span>}</button>)}</div></>}
+    </div></div>, document.body);
+}
+/* v56.0 — موضع هوية المنشأة في الشريط العلوي + محدد المنشأة.
+   كل منشأة نشر/مشروع Firebase مستقل؛ الانتقال = إعادة تحميل نظيفة إلى ?t=<id> (يتحقق منه سجل المنشآت في tenant-boot)
+   بجلسة دخول مستقلة وتخزين محلي معزول (nsStorage) — فلا تنتقل بيانات ولا إعدادات ولا شعارات بين المنشآت.
+   قائمة «المنشآت على هذا الجهاز» (mq:tenants — خارج نطاق العزل عمدًا) تحفظ المعرّف والاسم فقط. */
+const MQ_TENANTS_KEY = 'mq:tenants';
+const tnOkId = (v) => typeof v === 'string' && /^[a-z0-9][a-z0-9-]{1,39}$/.test(v);
+/** يضيف/يحدّث منشأة في قائمة الجهاز (الأحدث أولًا، بحد 12) — دالة نقية */
+function tnRemember(list, id, name) {
+  if (!tnOkId(id)) return Array.isArray(list) ? list : [];
+  const L = (Array.isArray(list) ? list : []).filter(x => x && tnOkId(x.id) && x.id !== id);
+  return [{ id, name: String(name || '').replace(/[<>]/g, '').slice(0, 80) }, ...L].slice(0, 12);
+}
+/** رابط الانتقال إلى منشأة — نفس المسار مع ?t=<id> فقط (لا يقبل إعدادًا من الرابط) */
+function tnHref(loc, id) { if (!tnOkId(id)) return ''; const base = String((loc && loc.pathname) || '/'); return base + '?t=' + encodeURIComponent(id); }
+const tnList = () => { try { const a = JSON.parse(localStorage.getItem(MQ_TENANTS_KEY) || '[]'); return Array.isArray(a) ? a.filter(x => x && tnOkId(x.id)) : []; } catch { return []; } };
 function TenantChip({ org, dark }) {
   const TB = tenantBrand(org, { lang: isEn() ? 'en' : 'ar' });
+  const [open, setOpen] = useState(false); const [code, setCode] = useState(''); const [list, setList] = useState([]);
+  useEffect(() => { try { const n = tnRemember(tnList(), TENANT.id, TB.name || TENANT.name); localStorage.setItem(MQ_TENANTS_KEY, JSON.stringify(n)); setList(n); } catch { } }, [TB.name]);   // eslint-disable-line react-hooks/exhaustive-deps
   if (!TB.name && !TB.logo) return null;
   const lg = dark ? (TB.logoAlt || TB.logo) : TB.logo;
-  return <span className="tn-chip" data-tenant-chip title={TB.name} style={{ '--tbp': TB.colors.primary }}>{lg ? <img src={lg} alt="" /> : <span className="tn-ini">{(TB.name || '').slice(0, 1)}</span>}<span className="tn-name">{TB.name}</span></span>;
+  const go = (id) => { const h = tnHref(window.location, id); if (h && id !== TENANT.id) window.location.href = h; };
+  const others = list.filter(x => x.id !== TENANT.id);
+  return <span className="tn-wrap">
+    <button type="button" className="tn-chip" data-tenant-chip title={TB.name} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)} style={{ '--tbp': TB.colors.primary }}>
+      {lg ? <img src={lg} alt="" /> : <span className="tn-ini">{(TB.name || '').slice(0, 1)}</span>}<span className="tn-name">{TB.name}</span><ChevronDown size={13} /></button>
+    {open && <div className="tn-menu" role="menu" data-tenant-menu onMouseLeave={() => setOpen(false)}>
+      <div className="tn-cur"><b>{TB.name}</b><span className="num">{TENANT.id}</span></div>
+      {others.length > 0 && <div className="tn-sec">{TX('المنشآت على هذا الجهاز')}</div>}
+      {others.map(x => <button key={x.id} type="button" role="menuitem" className="tn-it" onClick={() => go(x.id)} data-tenant-go={x.id}>{x.name || x.id}<span className="num">{x.id}</span></button>)}
+      <div className="tn-sec">{TX('فتح منشأة أخرى')}</div>
+      <form className="row" style={{ gap: 6 }} onSubmit={e => { e.preventDefault(); go(code.trim().toLowerCase()); }}>
+        <input className="inp n" dir="ltr" value={code} onChange={e => setCode(e.target.value)} placeholder="tenant-id" aria-label={TX('رمز المنشأة')} data-tenant-code style={{ flex: 1, height: 34 }} />
+        <button className="btn sm pri" disabled={!tnOkId(code.trim().toLowerCase())}>{TX('انتقال')}</button></form>
+      <div className="tn-note">{TX('الانتقال يفتح المنشأة بدخول مستقل — لا تنتقل أي بيانات بين المنشآت')}</div>
+    </div>}
+  </span>;
 }
 function BrandHead({ title, sub, logo }) {
   // v47.2: العلامة أعلاه دائمًا شعار النظام «مِثقال»؛ شعار الشركة (logo) يظهر بجانب اسمها في العنوان
