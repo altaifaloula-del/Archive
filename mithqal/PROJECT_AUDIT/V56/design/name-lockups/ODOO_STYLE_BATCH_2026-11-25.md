@@ -44,3 +44,9 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 ## «رقم» وRaqamo — تحديث
 حقل «رقم» مزدحم في السعودية بنشاط المنصة نفسه: Raqam (تمويل/BNPL للمنشآت، 2022)، Raqamyah/رقمية (إقراض جماعي مرخص من ساما)، Raqame (تطبيق نقاط بيع ومخزون ومحاسبة على Google Play)، أرقام Arqam (محاسبة سحابية سعودية)، الرقيم Raqeem (محاسبة وERP سعودي). raqam.com وraqm.com محجوزة.
 ⇒ **Raqamo مرتفع الخطر** رغم توفر raqamo.com — يُستبعد.
+
+## حقل الثقة والنمو — .com من Verisign + بحث تعارض
+- 26 اسمًا: محجوزة .com: nakhla/nakhlo/nakhlah، sunbula/sunbul، wareef/warif، rabwa/rabwah، numuw، nameer، ghirsa، jathro، rasina، thiqo، yaqeeno، sidqo، namaa.
+- متاحة .com: **sunbulo**، yaneea، jidhro، wathqo، namaao، nakhlio، wareefo، rabwo.
+- Wareef: شركة تقنية معلومات سعودية منذ 1998 (حلول مصرفية) ⇒ مستبعد.
+- **Sunbulo — سُنبُلو** (من «سنبلة»): sunbulo.com **متاح**؛ أقرب نتيجة Sunbula استشارات صغيرة في القدس (مجال مختلف). **مرشح نظيف.**
