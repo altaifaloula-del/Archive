@@ -25,6 +25,9 @@ export function PosApp({ org, ops, me, myBranches, commit, commitOrg, say }) {
   const cats = [...new Set(prods.map(p => p.cat || 'أخرى'))];
   const [cat, setCat] = useState(''); const [q, setQ] = useState('');
   const [cart, setCart] = useState([]); const [channel, setChannel] = useState('takeaway');
+  // v56.0 (GAP-007): الطلبات المعلّقة على هذا الجهاز لهذا الفرع — الخطافات هنا قبل أي «return» مبكر (قاعدة React)
+  const [holds, setHolds] = useState(() => posHolds((br || {}).id)); const [holdOpen, setHoldOpen] = useState(false);
+  useEffect(() => { setHolds(posHolds((br || {}).id)); setHoldOpen(false); }, [(br || {}).id]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [disc, setDisc] = useState({ mode: 'amt', amt: '', reason: '' }); const [pay, setPay] = useState(null); const [last, setLast] = useState(null);
   const [code, setCode] = useState(''); const [quickP, setQuickP] = useState(false); const [diag, setDiag] = useState(false); const [sending, setSending] = useState(false); const [ext, setExt] = useState({ disc: false, code: false, loy: false }); const [ordF, setOrdF] = useState(() => ({ d: businessDay(), pay: 'all', q: '' })); const [cust, setCust] = useState({ phone: '', name: '', redeem: false });
   const loyCfg = org.loyaltyCfg || {}; const [loy, setLoy] = useState(null);
@@ -340,8 +343,6 @@ export function PosApp({ org, ops, me, myBranches, commit, commitOrg, say }) {
   const pl = (l) => priced.lines.find(x => x.key === l.key) || {};
   const payMs = (cfg.payMethods || []).filter(x => x.active !== false && x.n);
   // v56.0 (GAP-007): الطلبات المعلّقة على هذا الجهاز لهذا الفرع — بلا رقم فاتورة حتى الدفع
-  const [holds, setHolds] = useState(() => posHolds((br || {}).id)); const [holdOpen, setHoldOpen] = useState(false);
-  useEffect(() => { setHolds(posHolds((br || {}).id)); setHoldOpen(false); }, [(br || {}).id]);   // eslint-disable-line react-hooks/exhaustive-deps
   const holdCur = () => {
     if (payTab) return say('أنت في دفع حساب طاولة — أكمل الدفع أو ألغه', 'no');
     const r = posHoldPut(posHolds(br.id), { id: uid('hold'), at: nowISO(), by: me.name, channel, cart, cust, disc, code, label: (cust.name || cust.phone || '').trim() });
