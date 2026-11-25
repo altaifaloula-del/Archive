@@ -118,3 +118,54 @@ test('ACC-V56-001: منشأة بإقفال سنة واحدة (بيانات ما 
   const o2 = baseOrg({ taxCfg: { enabled: false }, yearEnd: { enabled: true, closeDate: '2026-12-31' } });
   near(-(tb(E.buildAccounting(o2, yeOps))['3201'] || 0), 550);
 });
+
+/* ===================== PAY-V56-001: الرواتب حسب مدة الخدمة ===================== */
+const emp = (x = {}) => ({ id: 'e1', name: 'سعد', branchId: 'b1', nationality: 'saudi', hireDate: '2020-01-01', gosiSubject: true, baseSalary: 6000, housingAllowance: 1500, transportAllowance: 500, ...x });
+const G = { gosiCfg: { enabled: true } };
+
+test('PAY-V56-001: شهر كامل لا يتغير — الأرقام مطابقة لاختبار v47.2', () => {
+  const [r] = E.payrollRowsOf(G, [], [emp()], '2026-10');
+  assert.equal(r.factor, 1); near(r.gross, 8000); near(r.gEmp, 731.25); near(r.net, 7268.75);
+});
+
+test('PAY-V56-001: موظف يُعيَّن بعد الشهر لا يُستحق له شيء (كان يُستحق راتبًا كاملًا في الاستحقاق التلقائي)', () => {
+  const [r] = E.payrollRowsOf(G, [], [emp({ hireDate: '2026-11-01' })], '2026-10');
+  assert.equal(r.factor, 0); near(r.gross, 0); near(r.gEmp, 0); near(r.gEr, 0); near(r.net, 0);
+  const org = { ...baseOrg(), ...G, employees: [emp({ hireDate: '2026-11-01' }), emp({ id: 'e2' })] };
+  const A = E.payrollAccrualApply({ ledgerEntries: [], advances: [] }, org, '2026-10');
+  assert.deepEqual(A.entries.map(x => x.partnerKey), ['emp:e2'], 'المعيَّن في نوفمبر لا يدخل استحقاق أكتوبر');
+});
+
+test('PAY-V56-001: تعيين منتصف الشهر — الأساسي والبدلات بنسبة الأيام ÷ 30، والمكافأة والسلفة كما هي', () => {
+  const adv = [{ employeeId: 'e1', month: '2026-10', type: 'bonus', amount: 300 }, { employeeId: 'e1', month: '2026-10', type: 'advance', amount: 500 }];
+  const [r] = E.payrollRowsOf(G, adv, [emp({ hireDate: '2026-10-20' })], '2026-10');
+  assert.equal(r.days, 12, '20 → 31 أكتوبر'); near(r.factor, 0.4);
+  near(r.allow, 800, '(1500 + 500) × 12/30'); near(r.gross, 3500, '6000×0.4 + 800 + 300 مكافأة');
+  near(r.gEmp, 806.25, 'التأمينات اشتراك شهري كامل — معيَّن 2026 = النظام الجديد 10.75% × 7500'); near(r.net, 3500 - 500 - 806.25);
+});
+
+test('PAY-V56-001: انتهاء الخدمة — الشهر الأخير جزئي، وما بعده صفر، والموقوف بلا تاريخ صفر', () => {
+  const left = emp({ isActive: false, endDate: '2026-10-10' });
+  const [a] = E.payrollRowsOf(G, [], [left], '2026-10'); assert.equal(a.days, 10); near(a.gross, 8000 / 3);
+  const [b] = E.payrollRowsOf(G, [], [left], '2026-11'); near(b.gross, 0); near(b.gEmp, 0);
+  const [c] = E.payrollRowsOf(G, [], [emp({ isActive: false })], '2026-10'); near(c.gross, 0);
+  const org = { ...baseOrg(), ...G, employees: [left] };
+  const A = E.payrollAccrualApply({ ledgerEntries: [], advances: [] }, org, '2026-10');
+  assert.equal(A.entries.length, 1, 'المنتهية خدمته في أكتوبر يُستحق له ما خدمه'); near(A.entries[0].credit, 8000 / 3);
+  assert.equal(E.payrollAccrualApply({ ledgerEntries: [], advances: [] }, org, '2026-11').entries.length, 0);
+});
+
+test('PAY-V56-001: فبراير وأشهر 31 يومًا — الشهر الكامل راتب كامل لا 28/30 ولا 31/30', () => {
+  assert.equal(E.payFactor(emp(), '2026-02').f, 1);
+  assert.equal(E.payFactor(emp({ hireDate: '2026-02-01' }), '2026-02').f, 1);
+  assert.equal(E.payFactor(emp({ hireDate: '2026-01-01', endDate: '2026-01-31', isActive: false }), '2026-01').f, 1);
+  assert.equal(E.payFactor(emp({ hireDate: '2026-03-02' }), '2026-03').days, 30, '2 → 31 مارس = 30 يومًا (الحد)');
+});
+
+test('الاستحقاق التلقائي للرواتب لا يتكرر لنفس الشهر، ولا يُنشأ لشهر مقفل', () => {
+  const org = { ...baseOrg(), ...G, employees: [emp()] };
+  const A = E.payrollAccrualApply({ ledgerEntries: [], advances: [] }, org, '2026-10');
+  assert.equal(A.entries.length, 1);
+  assert.equal(E.payrollAccrualApply(A.next, org, '2026-10').entries.length, 0, 'مرة واحدة فقط');
+  assert.equal(E.payrollAccrualApply({ ledgerEntries: [], advances: [] }, { ...org, periodLocks: { lockedThrough: '2026-10' } }, '2026-10').entries.length, 0, 'الشهر المقفل');
+});

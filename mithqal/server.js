@@ -16,7 +16,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { onboardEgs } from './zatca/onboard.js';
-import { vaultReady } from './zatca/vault.js';
+import { vaultReady, keyId, vaultCheck } from './zatca/vault.js';
 import { createVerifier } from './server-auth.js';
 import { planAllows, PLAN_AR } from './plans.js';
 import { billingConfig, mountBilling, moyasarGateway, firestoreStore, saTokenSource, memoryStore } from './server-billing.js';
@@ -222,7 +222,11 @@ const zatcaAllowed = (req, res) => {
   if (FB_READY && !ZATCA_ROLES.has(req.user.role)) { res.status(403).json({ error: 'تسجيل أجهزة الفوترة للمفوَّضين فقط (مسؤول النظام أو المكتب الرئيسي)' }); return false; }
   return true;
 };
-app.get('/api/zatca/config', requireMember, (req, res) => res.json({ vault: vaultReady(tenantVault(req)), envs: ['sandbox', 'simulation'], canOnboard: (!FB_READY || ZATCA_ROLES.has(req.user.role)) && planAllows(tenantOf(req).plan, 'zatca') }));
+// v56.0 (BUG-012): فحص مفتاح الخزنة عند الإقلاع — غيابه أو تغيّره عن البصمة المثبّتة (ZATCA_KEY_ID) يُسجَّل خطأً صريحًا
+{ const vc = vaultCheck(undefined, process.env.ZATCA_KEY_ID);
+  if (!vc.ok) console.error('[zatca] مفتاح تشفير أسرار الأجهزة: ' + ({ missing: 'غير مضبوط (ZATCA_ENC_KEY)', short: 'أقصر من 32 حرفًا', mismatch: 'تغيّر! البصمة ' + vc.kid + ' ≠ المثبّتة ' + vc.expected + ' — الأجهزة المسجّلة لن تُفك؛ أعد المفتاح الأصلي من النسخة الاحتياطية' })[vc.why]);
+  else if (vc.kid) console.log('[zatca] بصمة مفتاح الخزنة ' + vc.kid + (vc.expected ? ' (مطابقة)' : ' — ثبّتها في ZATCA_KEY_ID لاكتشاف أي تغيّر')); }
+app.get('/api/zatca/config', requireMember, (req, res) => res.json({ vault: vaultReady(tenantVault(req)), keyId: keyId(tenantVault(req)), envs: ['sandbox', 'simulation'], canOnboard: (!FB_READY || ZATCA_ROLES.has(req.user.role)) && planAllows(tenantOf(req).plan, 'zatca') }));
 app.post('/api/zatca/onboard', zJson, requireMember, requireFeature('zatca'), rateLimit({ windowMs: 3600000, max: 12, keyFn: (r) => 'z:' + tenantOf(r).id + ':' + ((r.user && r.user.email) || r.ip) }), async (req, res) => {
   if (!zatcaAllowed(req, res)) return;
   const vault = tenantVault(req);

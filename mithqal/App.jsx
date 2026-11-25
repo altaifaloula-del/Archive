@@ -3438,7 +3438,7 @@ export { ErrorBoundary, logClientError, lockedLedgerChanged };
 export { posReturnable, posReturnCalc, posRefundOptions, posReturnHtml, saleRetUse, posReturnLoyDed };
 export { jeLive, jeOwner, canApproveJe, jeAutoSt, vatCloseLive, WF_DOCS, wfTiers, wfOn, wfRequired, poNeedsAppr, wfState, wfCanAct, wfApprove };   // v47.1 اعتماد القيد اليدوي
 export { gosiNewSched, gosiNewAuto };   // v47.2 الرواتب   // v46.8 مرتجع نقطة البيع   // v46.8: للاختبارات الوظيفية (حارس الإقفال)
-export { findDupClosings, clDayKey, clrKeyId, yearEndDates, yearEndNext };   // v56.0 (GAP-002) الحارس المركزي لتكرار الإغلاق
+export { findDupClosings, clDayKey, clrKeyId, yearEndDates, yearEndNext, payFactor };   // v56.0 (GAP-002) الحارس المركزي لتكرار الإغلاق
 if (typeof window !== 'undefined' && !window.__mizanErrHook) {
   window.__mizanErrHook = true;
   window.addEventListener('error', (e) => logClientError(e.error || e.message, 'window'));
@@ -6163,7 +6163,8 @@ const prevMonthOf = (td) => { const [y, m] = td.split('-').map(Number); const d 
 function payrollAccrualApply(d, org, month) {
   if ((d.ledgerEntries || []).some(x => x.kind === 'salary_accrual' && x.month === month)) return { next: d, entries: [] };
   if (periodLocked(org, month + '-28')) return { next: d, entries: [] };
-  const emps = (org.employees || []).filter(e => e.isActive !== false && (org.branches || []).some(b => b.id === e.branchId));
+  // v56.0: المنتهية خدمته خلال الشهر يُستحق له ما خدمه منه (payFactor) — كان يُستبعد كليًا
+  const emps = (org.employees || []).filter(e => (e.isActive !== false || String(e.endDate || '') >= month + '-01') && (org.branches || []).some(b => b.id === e.branchId));
   const rows = payrollRowsOf(org, d.advances, emps, month);
   const entries = rows.filter(r => r.gross > 0).map(r => ({ id: 'le_acc_' + r.e.id + '_' + month, partnerKey: 'emp:' + r.e.id, date: month + '-28', month, kind: 'salary_accrual',
     desc: 'استحقاق راتب شهر ' + month, src: 'salary', debit: 0, credit: r.gross, auto: true }));
@@ -8780,10 +8781,26 @@ function DisbursementForm({ org, me, balance, commit, say, onClose }) {
    payrollRowsOf: حساب كشف الرواتب الموحّد (تستخدمه شاشة الرواتب والمسير معًا — رقم واحد في كل مكان).
    الإضافي يُخزَّن كحركة في advances بنوع 'overtime' (مثل المكافأة: إضافة للإجمالي) فيدخل الاستحقاق والقيود تلقائيًا. */
 const PAY_ADD_TYPES = ['bonus', 'overtime'];
+/* v56.0 (PAY-V56-001): نسبة أيام الخدمة في الشهر — كان الراتب كاملًا دائمًا: موظف يُعيَّن في نوفمبر يُستحق له راتب أكتوبر كاملًا
+   (الاستحقاق التلقائي)، والموظف المنتهية خدمته يظهر براتب كامل كل شهر في مسير الرواتب. الأجر اليومي = الشهري ÷ 30 (كأساس الإضافي، م107).
+   شهر كامل = 1 · خارج مدة الخدمة = 0 · جزئي = أيام الخدمة ÷ 30 (بحد أقصى 1). الموقوف بلا تاريخ انتهاء = 0. */
+function payFactor(e, month) {
+  const ms = month + '-01', mEnd = monthEnd(month);
+  if (e.isActive === false && !e.endDate) return { f: 0, days: 0 };
+  const hd = String(e.hireDate || '').slice(0, 10), ed = String(e.endDate || '').slice(0, 10);
+  const st = /^\d{4}-\d{2}-\d{2}$/.test(hd) && hd > ms ? hd : ms, en = /^\d{4}-\d{2}-\d{2}$/.test(ed) && ed < mEnd ? ed : mEnd;
+  if (st > en) return { f: 0, days: 0 };
+  if (st === ms && en === mEnd) return { f: 1, days: 30 };
+  const days = Math.round((Date.parse(en + 'T00:00:00Z') - Date.parse(st + 'T00:00:00Z')) / 864e5) + 1;
+  return { f: Math.min(30, days) / 30, days: Math.min(30, days) };
+}
 function payrollRowsOf(org, advances, emps, month) {
   const gosiOn = !!(org.gosiCfg || {}).enabled;
   const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
-  return (emps || []).map(e => {
+  return (emps || []).map(e0 => {
+    const pf = payFactor(e0, month);
+    // الأساسي والبدلات بنسبة أيام الخدمة؛ المكافأة والإضافي والسلف والجزاءات كما سُجّلت للشهر
+    const e = pf.f === 1 ? e0 : { ...e0, baseSalary: r2((e0.baseSalary || 0) * pf.f), housingAllowance: r2((e0.housingAllowance || 0) * pf.f), transportAllowance: r2((e0.transportAllowance || 0) * pf.f), otherAllowance: r2((e0.otherAllowance || 0) * pf.f) };
     const ads = (advances || []).filter(a => a.employeeId === e.id && a.month === month);
     const draws = sum(ads.filter(a => ['advance', 'salary_draw'].includes(a.type)), a => a.amount);
     const bonus = r2(sum(ads.filter(a => a.type === 'bonus'), a => a.amount));
@@ -8792,10 +8809,11 @@ function payrollRowsOf(org, advances, emps, month) {
     const cuts = sum(ads.filter(a => !['advance', 'salary_draw', ...PAY_ADD_TYPES].includes(a.type)), a => a.amount);
     const allow = (e.housingAllowance || 0) + (e.transportAllowance || 0) + (e.otherAllowance || 0);
     const gross = r2((e.baseSalary || 0) + allow + bonus + ot);
-    const gr = gosiRatesFor(e, org.gosiCfg, month);   // v47.2: نسبة الشهر نفسه (جدول النظام الجديد)
-    const gEmp = (gosiOn && e.gosiSubject) ? r2(gr.base * gr.emp / 100) : 0;
-    const gEr = (gosiOn && e.gosiSubject) ? r2(gr.base * gr.er / 100) : 0;
-    return { e, ads, draws, bonus, ot, otHours, cuts, allow, gross, gEmp, gEr, net: r2(gross - draws - cuts - gEmp), flags: ads.filter(a => a.isUnjustified).length };
+    // التأمينات اشتراك شهري على الأجر المسجّل: كاملة لأي شهر فيه خدمة، ولا شيء خارجها
+    const gr = gosiRatesFor(e0, org.gosiCfg, month);   // v47.2: نسبة الشهر نفسه (جدول النظام الجديد)
+    const gEmp = (gosiOn && e0.gosiSubject && pf.f > 0) ? r2(gr.base * gr.emp / 100) : 0;
+    const gEr = (gosiOn && e0.gosiSubject && pf.f > 0) ? r2(gr.base * gr.er / 100) : 0;
+    return { e: e0, ads, draws, bonus, ot, otHours, cuts, allow, gross, gEmp, gEr, net: r2(gross - draws - cuts - gEmp), flags: ads.filter(a => a.isUnjustified).length, factor: pf.f, days: pf.days };
   });
 }
 
