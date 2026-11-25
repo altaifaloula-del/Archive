@@ -64,3 +64,8 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 - 71 اسمًا مبتكرًا جديدًا: 41 من 5–6 أحرف كلها محجوزة؛ من 30 أطول بقي 11 متاحًا.
 - استُبعد للمعنى: Zulmera (ظلم)، Kalbari (كلب)، Qordana (قرد)، Nerdaka (nerd)، Mirdona (mierda)، Ruskora (روسيا).
 - **المتاحة والنظيفة في البحث:** talmeka.com، selkari.com، halseko.com، jendoro.com، raskoni.com — لا شركة ولا تطبيق ولا علامة ظاهرة بأي منها.
+
+## من فكرة «بيئة الأعمال»
+- العبارة نفسها وصفية ومستعملة حكوميًا (برامج «تحسين بيئة الأعمال») ⇒ غير قابلة للتسجيل.
+- 20 اسمًا مشتقًا (biya/biz): متاحة .com: **biyalma**، biyamo، bizveno (فيه V ⇒ مستبعد).
+- Biyalma (بيئة + عالَم): لا تعارض ظاهر. Biyamo: قريب من BIYŌMA (علامة أسلوب حياة يابانية) — خطر منخفض.
