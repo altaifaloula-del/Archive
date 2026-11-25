@@ -59,3 +59,8 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 - 20 اسمًا: كل .com محجوزة عدا wablah.
 - Muzn: علامة الصيرفة الإسلامية لبنك عُمان الوطني ⇒ مستبعد. Rakhaa: منصة عُمانية لتحقيق الدخل ⇒ مستبعد. Wafra: عدة شركات تقنية مالية ⇒ مستبعد.
 - **Sidr — سِدر**: لا منافس برمجي/مالي ظاهر (أقرب SIDR Solutions الهندية الصغيرة، وSidra Capital اسم مختلف). sidr.com محجوز.
+
+## أسماء مبتكرة عالمية — شرط: name.com متاح (اختيار المالك)
+- 71 اسمًا مبتكرًا جديدًا: 41 من 5–6 أحرف كلها محجوزة؛ من 30 أطول بقي 11 متاحًا.
+- استُبعد للمعنى: Zulmera (ظلم)، Kalbari (كلب)، Qordana (قرد)، Nerdaka (nerd)، Mirdona (mierda)، Ruskora (روسيا).
+- **المتاحة والنظيفة في البحث:** talmeka.com، selkari.com، halseko.com، jendoro.com، raskoni.com — لا شركة ولا تطبيق ولا علامة ظاهرة بأي منها.
