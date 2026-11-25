@@ -1,0 +1,114 @@
+/* نُقل من App.jsx (v38.3) — يُحمَّل عند فتح التطبيق فقط */
+import React, { useEffect, useState } from 'react';
+import { ClipboardCheck, ShieldCheck, AlertTriangle, Eye, Check, X, Lock } from 'lucide-react';
+import { Badge, ClosingView, Kpi, LOCK_MSG, ROLES, arDate, arTime, money, nowISO, periodLocked, uid, signDecision, sigFailMsg, loadRelease, loadSignoffs, sigVerify, SIG_BADGE, closingImgs, closingArchiveOne, closingStripImgs } from '../../App.jsx';
+
+export function Approvals({ org, me, scoped, commit, say }) {
+  const [note, setNote] = useState({});
+  const [view, setView] = useState(null);
+  const isGM = !!ROLES[me.role]?.approver;
+  // v40.0: حالة التوقيع الموثّق لكل إغلاق في القائمة
+  const [sigs, setSigs] = useState(null); const [cut, setCut] = useState('');
+  useEffect(() => { let dead = false; (async () => { const r = await loadRelease(); const l = await loadSignoffs(me, [...new Set(scoped.closings.map(c => c.branchId))]); if (!dead) { setCut((r && r.cutover) || ''); setSigs(l); } })(); return () => { dead = true; }; }, [me, scoped.closings.length]);
+  const queue = scoped.closings.filter(c => c.status === 'submitted' || (c.status === 'approved' && c.gmApprovalStatus === 'pending'))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const act = async (c, kind) => {
+    const reason = note[c.id] || '';
+    if ((kind === 'audit' || kind === 'reject') && periodLocked(org, c.date)) return say(LOCK_MSG(c.date), 'no');
+    if (kind === 'reject' && !reason) return say('اكتب سبب الرفض قبل الإرجاع', 'no');
+    // v40.0: توقيع موثّق قبل الحفظ — القواعد ترفض غير المؤهل، ومن قدّم الإغلاق لا يدققه (قرار المالك)
+    const sg = await signDecision('closing', kind, c);
+    if (!sg.ok) return say(sigFailMsg(sg, kind === 'audit' ? 'التدقيق' : kind === 'gm' ? 'الاعتماد النهائي' : 'الرفض'), 'no');
+    const sigF = sg.id ? { [kind === 'audit' ? 'sigAudit' : kind === 'gm' ? 'sigGm' : 'sigReject']: sg.id } : {};
+    // v52.8 (قرار المالك): عند الاعتماد النهائي تُنقل صور الإغلاق للأرشيف وتُزال من ملف الفرع — وإن تعذّر الأرشيف تبقى الصور (لا فقد)
+    let strip = false;
+    if (kind === 'gm' && closingImgs(c).length) { const ar = await closingArchiveOne(c, me); strip = !!ar.ok; }
+    await commit(d => ({
+      ...d,
+      // v15.12: رفض الإغلاق يُبطِل توريده أيضًا (الحالة → rejected) فلا يبقى قيدٌ «تحت التحويل» وهمي في الحساب الوسيط ولا نقصٌ في نقد الفرع. (مطابق لسلوك حذف الإغلاق.)
+      transfers: kind === 'reject' ? (d.transfers || []).map(t => t.closingId === c.id ? { ...t, status: 'rejected' } : t) : d.transfers,
+      closings: d.closings.map(x => {
+        if (x.id !== c.id) return x;
+        if (kind === 'audit') return { ...x, ...sigF, status: 'approved', auditedBy: me.name, auditedAt: nowISO(), updatedAt: nowISO() };
+        if (kind === 'gm') return { ...(strip ? closingStripImgs(x) : x), ...sigF, gmApprovalStatus: 'approved', gmApprovedBy: me.name, gmApprovedAt: nowISO(), gmNotes: reason, updatedAt: nowISO() };
+        return { ...x, ...sigF, status: 'rejected', rejectionReason: reason, updatedAt: nowISO() };
+      }),
+      notifications: [{
+        id: uid('n'), type: kind === 'reject' ? 'closing_rejected' : 'gm_approval',
+        title: kind === 'reject' ? 'إغلاق مرفوض ويحتاج تصحيحاً' : kind === 'gm' ? 'اعتماد نهائي من الإدارة العليا' : 'تم تدقيق الإغلاق',
+        message: `${c.branchName} — ${arDate(c.date)}${reason ? ' · ' + reason : ''}`,
+        severity: kind === 'reject' ? 'high' : 'info', branchId: c.branchId, closingId: c.id,
+        date: c.date, createdAt: nowISO(), isRead: false
+      }, ...(d.notifications || [])].slice(0, 60)
+    }), {
+      actionType: kind === 'reject' ? 'reject' : 'approve', targetType: 'daily_closing', targetId: c.id,
+      branchName: c.branchName,
+      title: kind === 'audit' ? 'دقّق إغلاقاً مالياً' : kind === 'gm' ? 'اعتمد إغلاقاً نهائياً' : 'أرجع إغلاقاً للتصحيح',
+      details: `${c.branchName} — ${arDate(c.date)}${reason ? ' · ' + reason : ''}`
+    });
+    say(kind === 'reject' ? 'أُرجع الإغلاق للفرع مع السبب' : 'تم الاعتماد بنجاح');
+    setNote(p => ({ ...p, [c.id]: '' }));
+  };
+
+  return (
+    <div className="grid" style={{ gap: 14 }}>
+      <div className="grid g3">
+        <Kpi label="بانتظار التدقيق المالي" value={scoped.closings.filter(c => c.status === 'submitted').length} icon={ClipboardCheck} color="#E0A458" />
+        <Kpi label="بانتظار الاعتماد النهائي" value={scoped.closings.filter(c => c.status === 'approved' && c.gmApprovalStatus === 'pending').length} icon={ShieldCheck} color="#5B93C4" />
+        <Kpi label="إغلاقات بها فروقات" value={queue.filter(c => c.variance !== 0).length} icon={AlertTriangle} color="#D9544D" />
+      </div>
+
+      {queue.length === 0 && <div className="card"><div className="empty">لا يوجد ما ينتظر إجراءك — كل الإغلاقات مدقّقة ومعتمدة.</div></div>}
+
+      {queue.map(c => {
+        const needAudit = c.status === 'submitted';
+        const canAct = needAudit ? (ROLES[me.role]?.scope !== 'own' && ROLES[me.role]?.tabs?.includes('approve')) : isGM;
+        // v52.1 (BUG-08-01): ترحيل بلا توقيع بعد بدء التوثيق لا يُدقَّق (القواعد ترفضه) — المسار الصحيح «إرجاع» ليعيد الفرع ترحيله موقّعًا
+        const noSub = needAudit && !!sigs && !c.sigSubmit && !!cut && c.date >= cut;
+        return (
+          <div key={c.id} className="card" style={{ borderColor: c.variance < 0 ? 'rgba(217,84,77,.3)' : 'var(--line)' }}>
+            <div className="card-h">
+              <div>
+                <div className="card-t">{c.branchName}<span className="dt" style={{ color: 'var(--faint)', fontSize: 12 }}>{arDate(c.date)}</span></div>
+                <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 3 }}>سجّله {c.managerName} · {arTime(c.createdAt)}{c.updatedAt && c.updatedAt !== c.createdAt ? ' · آخر تحديث ' + arTime(c.updatedAt) : ''}</div>
+              </div>
+              <div className="row">
+                <Badge s={c.status} />
+                {sigs && (needAudit
+                  ? (c.sigSubmit ? <span className="badge b-mint sig-b">ترحيل موقّع</span> : (cut && c.date >= cut ? <span className="badge b-rose sig-b" title="رُحّل بلا توقيع موثّق — يتعذّر تدقيقه حتى يُعاد ترحيله">ترحيل بلا توقيع</span> : null))
+                  : (() => { const v = sigVerify('closing', c, sigs, cut); return SIG_BADGE[v.st] ? <span className={'badge sig-b ' + SIG_BADGE[v.st][0]}>{SIG_BADGE[v.st][1]}</span> : null; })())}
+                {needAudit ? <span className="badge b-dim">المرحلة 1: تدقيق مالي</span> : <span className="badge b-sky">المرحلة 2: اعتماد نهائي</span>}
+              </div>
+            </div>
+            <div className="grid g4" style={{ gap: 9 }}>
+              <div className="mono-b"><span style={{ fontSize: 11 }}>الإيراد</span><span className="num" style={{ color: 'var(--brass)' }}>{money(c.totalRevenue)}</span></div>
+              <div className="mono-b"><span style={{ fontSize: 11 }}>المصروف</span><span className="num" style={{ color: 'var(--rose)' }}>{money(c.totalExpenses)}</span></div>
+              <div className="mono-b"><span style={{ fontSize: 11 }}>المرحّل</span><span className="num">{money(c.transferredToMainTreasury)}</span></div>
+              <div className="mono-b" style={{ borderColor: c.variance !== 0 ? 'rgba(217,84,77,.4)' : 'var(--line)' }}>
+                <span style={{ fontSize: 11 }}>الفرق</span>
+                <span className="num" style={{ color: c.variance < 0 ? 'var(--rose)' : c.variance > 0 ? 'var(--mint)' : 'var(--faint)' }}>{money(c.variance)}</span>
+              </div>
+            </div>
+            {noSub && <div className="note" data-nosub style={{ marginTop: 10, borderColor: 'rgba(217,84,77,.4)' }}>رُحّل هذا الإغلاق دون توقيع تقديم موثّق، فلا يمكن اعتماد تدقيقه. اكتب السبب (مثل «يرجى إعادة الترحيل للتوثيق») واضغط «إرجاع» — يعيد {c.managerName || 'مدير الفرع'} ترحيله فيُوقَّع تلقائيًا، ثم تعتمده.</div>}
+            {c.varianceReason && <div style={{ fontSize: 11.5, color: 'var(--amber)', marginTop: 10 }}>تبرير الفرق: {c.varianceReason}</div>}
+            <div className="row" style={{ marginTop: 12 }}>
+              <input className="inp" style={{ flex: 1, minWidth: 180 }} placeholder="ملاحظة التدقيق أو سبب الإرجاع"
+                value={note[c.id] || ''} onChange={e => setNote(p => ({ ...p, [c.id]: e.target.value }))} />
+              <button className="btn sm gh" onClick={() => setView(c)}><Eye size={13} />تفاصيل</button>
+              {canAct ? (
+                <>
+                  {!noSub && <button className="btn sm ok" onClick={() => act(c, needAudit ? 'audit' : 'gm')}>
+                    <Check size={13} />{needAudit ? 'اعتماد التدقيق' : 'اعتماد نهائي'}
+                  </button>}
+                  <button className="btn sm no" onClick={() => act(c, 'reject')}><X size={13} />إرجاع</button>
+                </>
+              ) : <span className="badge b-dim"><Lock size={10} />خارج صلاحيتك</span>}
+            </div>
+          </div>
+        );
+      })}
+      {view && <ClosingView c={view} org={org} onClose={() => setView(null)} />}
+    </div>
+  );
+}

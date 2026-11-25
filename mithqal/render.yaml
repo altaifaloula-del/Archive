@@ -1,0 +1,26 @@
+# خادم المنصة: وسيط الذكاء الاصطناعي وتسجيل أجهزة الفوترة الإلكترونية — الواجهة تُنشر على GitHub Pages
+services:
+  - type: web
+    name: mizan-ai
+    runtime: node
+    plan: free            # المجانية تنام بعد 15 دقيقة خمول (أول طلب بعدها يتأخر ~دقيقة). غيّرها إلى starter لإلغاء ذلك
+    buildCommand: npm ci --omit=dev && npm install --prefix .esb --no-save --no-package-lock --no-audit --no-fund esbuild@0.25.12 && node scripts/build-mcp-engine.mjs && rm -rf .esb   # v53.9: اعتماديات التشغيل فقط + esbuild وحده لبناء محرك موصل Claude (تثبيت كل اعتماديات التطوير أفشل البناء)
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: NODE_OPTIONS        # v53.9: يستبدل قيمة سابقة (--max-old-space-size) كانت تلغي سقف عامل الموصل — لا تضع فيه سقف ذاكرة
+        value: --disable-warning=ExperimentalWarning
+      - key: MCP_WORKER_MB       # سقف ذاكرة عامل موصل Claude — ارفعه (مثل 1200) عند الترقية لخطة Standard 2GB. لا تضع --max-old-space-size في NODE_OPTIONS: يلغي هذا السقف
+        value: "280"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: FIREBASE_API_KEY
+        sync: false
+      - key: ZATCA_ENC_KEY       # مفتاح تشفير أسرار أجهزة الفوترة — يولّده Render عشوائيًا ولا يغادر الخادم
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: https://altaifaloula-del.github.io
