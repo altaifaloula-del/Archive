@@ -40,3 +40,7 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 - 45 اسمًا عربيًا أو مبتكرًا من 5–6 أحرف: كلها محجوزة عدا thabra وruqmo.
 - جذر «رقم»: raqmo/rakmo/arqamo/raqmy محجوزة؛ **raqamo.com متاح**، ruqmo.com متاح.
 - تعارض Raqamo: لا شركة/تطبيق بالاسم. الأقرب RAQMO-APP (منشئ تطبيقات للمتاجر، اليابان) — مجال برمجي مختلف، خطر منخفض–متوسط.
+
+## «رقم» وRaqamo — تحديث
+حقل «رقم» مزدحم في السعودية بنشاط المنصة نفسه: Raqam (تمويل/BNPL للمنشآت، 2022)، Raqamyah/رقمية (إقراض جماعي مرخص من ساما)، Raqame (تطبيق نقاط بيع ومخزون ومحاسبة على Google Play)، أرقام Arqam (محاسبة سحابية سعودية)، الرقيم Raqeem (محاسبة وERP سعودي). raqam.com وraqm.com محجوزة.
+⇒ **Raqamo مرتفع الخطر** رغم توفر raqamo.com — يُستبعد.
