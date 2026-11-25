@@ -69,3 +69,9 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 - العبارة نفسها وصفية ومستعملة حكوميًا (برامج «تحسين بيئة الأعمال») ⇒ غير قابلة للتسجيل.
 - 20 اسمًا مشتقًا (biya/biz): متاحة .com: **biyalma**، biyamo، bizveno (فيه V ⇒ مستبعد).
 - Biyalma (بيئة + عالَم): لا تعارض ظاهر. Biyamo: قريب من BIYŌMA (علامة أسلوب حياة يابانية) — خطر منخفض.
+
+## دفعة مبتكرة ثانية (name.com متاح شرط)
+- 40 اسمًا: متاح 9 — zamrina، yeltara، gorsina، tolsaro، haskina، tamesko، soltaki، kuldara، belkona.
+- استُبعد للمعنى: kuldara (kul بالتركية «عبد»)، belkona («بلكونة»)، gorsina (gore)، haskina («حسك»).
+- نظيفة في البحث: **yeltara، tamesko، zamrina** (أقرب Zamra Tech لخدمات تقنية — منخفض/متوسط)، **soltaki/tolsaro** (أقرب Soltaro بطاريات أسترالية — منخفض).
+- سلطان: sultan.com وكل البدائل محجوزة عدا sultanhq.com؛ اسم شخصي/لقب شائع ⇒ لا يحقق الشرط.
