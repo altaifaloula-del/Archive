@@ -2715,7 +2715,7 @@ test('v51.6 طباعة تقرير الإغلاق PDF: المستند وحده ب
   const ctx = await browser.newContext({ viewport: { width: 900, height: 1000 } }); const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto(base + 'comp/Launcher'); await p.waitForTimeout(1200);
   const open = () => p.evaluate(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; };
-    window.__M.printClosingA4({ id: 'c1', branchId: 'b1', branchName: 'طيبة', date: '2026-11-18', status: 'approved', totalRevenue: 9420, cashSales: 5000, networkSales: 3000, deliverySales: [], expenses: [{ id: 'x', categoryName: 'خضار', amount: 120, paymentMethod: 'cash' }], totalExpenses: 120, variance: 0, actualCashCount: 1000, expectedCashInSafe: 1000, createdBy: 'أحمد علي' },
+    window.__M.printClosingA4({ id: 'c1', branchId: 'b1', branchName: 'طيبة', date: '2026-11-18', status: 'approved', totalRevenue: 9420, cashSales: 5000, cardSales: 3000, deliverySales: [], expenses: [{ id: 'x', categoryName: 'خضار', amount: 120, paymentMethod: 'cash' }], totalExpenses: 120, variance: 0, actualCashCount: 1000, expectedCashInSafe: 1000, createdBy: 'أحمد علي' },
       { company: { name: 'شركة الطيف الأولى' }, branches: [{ id: 'b1', name: 'طيبة' }] }); });
   const state = () => p.evaluate(() => { const h = document.getElementById('mz-print'), r = h && (h.shadowRoot || h);
     const kids = r ? [...r.querySelectorAll('.page > *')] : [];
@@ -3319,5 +3319,36 @@ test('v56.0 GAP-018 العمل دون اتصال ثم المزامنة: فوات
   assert.equal(ids.length, 3, 'ثلاث فواتير بالضبط'); assert.deepEqual(new Set(ids), new Set(q.map(o => o.id)), 'نفس الفواتير');
   assert.equal(await p.evaluate(() => window.cur.posOrders.reduce((s, o) => s + o.total, 0)), 300, 'المجموع 3 × 100');
   assert.ok(await p.evaluate(() => (window.cur.posShifts || []).length >= 1), 'الوردية المحلية رُفعت');
+  assert.deepEqual(errs, []); await ctx.close();
+});
+
+test('v56.0 GAP-007 تعليق فاتورة السفري واستدعاؤها: بلا رقم فاتورة قبل الدفع، تبقى بعد إعادة الفتح، وتُستدعى ثم تُدفع', async () => {
+  const { p, errs, ctx } = await open({ viewport: { width: 1300, height: 1000 } }, 'live/PosApp/cs');
+  const setup = async () => { await p.evaluate(() => {
+    window.setOrg(g => ({ ...g, taxCfg: { enabled: false }, posCfg: { branches: ['b1'], autoPrint: false }, products: [{ id: 'k', name: 'كبسة', sellPrice: 100, cat: 'رئيسي' }, { id: 'm', name: 'مندي', sellPrice: 80, cat: 'رئيسي' }] }));
+    window.setOps(o => ({ ...o, posOrders: [] })); }); await p.waitForTimeout(400);
+    const ob = p.locator('button:has-text("فتح الوردية")'); if (await ob.count()) { await ob.click(); await p.waitForTimeout(400); } };
+  await p.evaluate(() => { localStorage.removeItem('mizan:posHold:b1'); localStorage.removeItem('mizan:posQueue'); }); await setup();
+  await p.locator('.pos-tile:has-text("كبسة")').click(); await p.locator('.pos-tile:has-text("كبسة")').click(); await p.locator('.pos-tile:has-text("مندي")').click();
+  await p.click('[data-hold]'); await p.waitForTimeout(250);
+  assert.match(await say(p), /عُلّق الطلب/);
+  const held = await p.evaluate(() => JSON.parse(localStorage.getItem('mizan:posHold:b1') || '[]'));
+  assert.equal(held.length, 1); assert.equal(held[0].cart.reduce((a, l) => a + l.qty, 0), 3);
+  assert.equal(await p.evaluate(() => window.cur.posOrders.length), 0, 'لا فاتورة');
+  assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('mizan:posQueue') || '[]').length), 0, 'لا رقم ولا عدّاد مستهلك');
+  // عميل آخر يُخدم أثناء التعليق
+  await p.locator('.pos-tile:has-text("مندي")').click(); await p.click('.pos-cart button:has-text("نقدي")'); await p.waitForTimeout(200); await p.click('.modal button:has-text("تأكيد")'); await p.waitForTimeout(500);
+  // إعادة فتح الصفحة: المعلّق باقٍ على الجهاز
+  await p.reload(); await p.waitForTimeout(500); await settle(p); await setup();
+  await p.click('[data-holdlist]'); await p.waitForTimeout(200);
+  assert.match(await p.locator('[data-holds]').innerText(), /3 صنف/);
+  // السعر تغيّر بعد التعليق: يُستدعى بالسعر الحالي
+  await p.evaluate(() => window.setOrg(g => ({ ...g, products: g.products.map(x => x.id === 'k' ? { ...x, sellPrice: 110 } : x) }))); await p.waitForTimeout(250);
+  await p.click('[data-holds] button:has-text("استدعاء")'); await p.waitForTimeout(300);
+  assert.match(await say(p), /استُدعي الطلب[\s\S]*حُدّث سعر: كبسة/);
+  assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('mizan:posHold:b1') || '[]').length), 0, 'خرج من المعلّقة');
+  await p.click('.pos-cart button:has-text("نقدي")'); await p.waitForTimeout(200); await p.click('.modal button:has-text("تأكيد")'); await p.waitForTimeout(600);
+  const tot = await p.evaluate(() => window.cur.posOrders.map(o => o.total).sort((a, b) => a - b));
+  assert.deepEqual(tot, [300], 'المعلّق دُفع بالسعر الحالي: 2×110 + 80 (سحابة الاختبار تبدأ فارغة بعد إعادة الفتح)');
   assert.deepEqual(errs, []); await ctx.close();
 });

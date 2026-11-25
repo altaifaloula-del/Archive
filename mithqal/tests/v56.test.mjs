@@ -169,3 +169,51 @@ test('الاستحقاق التلقائي للرواتب لا يتكرر لنف�
   assert.equal(E.payrollAccrualApply(A.next, org, '2026-10').entries.length, 0, 'مرة واحدة فقط');
   assert.equal(E.payrollAccrualApply({ ledgerEntries: [], advances: [] }, { ...org, periodLocks: { lockedThrough: '2026-10' } }, '2026-10').entries.length, 0, 'الشهر المقفل');
 });
+
+/* ===================== GAP-007: تعليق طلب السفري واستدعاؤه ===================== */
+test('GAP-007: التعليق لا يقبل سلة فارغة وله حد أقصى، والاستدعاء يعيد التسعير ويُسقط المحذوف', () => {
+  assert.ok(E.posHoldPut([], { cart: [] }).err, 'سلة فارغة');
+  const h = { id: 'h1', cart: [{ productId: 'k', name: 'كبسة', qty: 2, price: 90 }, { productId: 'gone', name: 'صنف محذوف', qty: 1, price: 10 }] };
+  const r = E.posHoldPut([], h); assert.equal(r.list.length, 1);
+  const full = Array.from({ length: E.POS_HOLD_MAX }, (_, i) => ({ id: 'x' + i, cart: [{ productId: 'k', qty: 1, price: 1 }] }));
+  assert.match(E.posHoldPut(full, h).err, /الحد/);
+  const R = E.posHoldRecall(h, [{ id: 'k', name: 'كبسة', sellPrice: 100 }]);
+  assert.deepEqual(R.cart.map(l => [l.productId, l.qty, l.price]), [['k', 2, 100]], 'السعر الحالي 100 لا المحفوظ 90');
+  assert.deepEqual(R.dropped, ['صنف محذوف']); assert.deepEqual(R.repriced, ['كبسة']);
+});
+
+/* ===================== المخزون: تسوية الجرد بالتكلفة ===================== */
+test('تسوية الجرد: عجز 5 وحدات بمتوسط مرجّح 11 → 5503 مدين 55 ومخزون المستودع دائن 55، وفائض يعكسها، والميزان متوازن', () => {
+  const org = baseOrg({ taxCfg: { enabled: false }, items: [{ id: 'i1', name: 'زيت', unit: 'لتر', type: 'stock' }], suppliers: [{ id: 's1', name: 'مورد' }], purchaseCfg: { perpetualFrom: '2026-01' },
+    warehouses: [{ id: 'wh-main', name: 'الرئيسي', kind: 'main', accCode: '160101' }, { id: 'wh-b1', name: 'طيبة', kind: 'branch', branchId: 'b1', parentId: 'wh-main', accCode: '160102' }] });
+  const inv = (id, qty, cost, d) => ({ id, supplierId: 's1', supplierName: 'مورد', amount: qty * cost, taxable: false, date: d, paidAmount: 0, branchId: 'b1', whId: 'wh-b1', lines: [{ itemId: 'i1', qty, unitCost: cost, net: qty * cost, stock: true }] });
+  const mv = (id, kind, qty, d, x = {}) => ({ id, whId: 'wh-b1', branchId: 'b1', itemId: 'i1', kind, qty, date: d, at: d + 'T08:00:00Z', ...x });
+  const ops = { invoices: [inv('p1', 10, 10, '2026-03-01'), inv('p2', 10, 12, '2026-03-02')], stockMoves: [], whTransfers: [],
+    whMoves: [mv('m1', 'purchase', 10, '2026-03-01', { unitCost: 10, invoiceId: 'p1' }), mv('m2', 'purchase', 10, '2026-03-02', { unitCost: 12, invoiceId: 'p2' }), mv('a1', 'adjust', -5, '2026-03-05')] };
+  const A = E.buildAccounting(org, ops); assert.equal(A.balanced, true);
+  const t = tb(A); near(t['5503'], 55, 'عجز الجرد 5 × 11'); near(t['160102'], 220 - 55, 'المخزون 165');
+  const B = E.buildAccounting(org, { ...ops, whMoves: [...ops.whMoves.slice(0, 2), mv('a2', 'adjust', 3, '2026-03-05')] });
+  assert.equal(B.balanced, true); near(tb(B)['5503'], -33, 'فائض 3 × 11 دائن'); near(tb(B)['160102'], 253);
+});
+
+/* ===================== التقارير = الدفتر ===================== */
+test('التقارير تطابق الدفتر: حركة الحسابات ودفتر الأستاذ والإجماليات المطبوعة = ميزان القيود، بالعربية RTL والإنجليزية LTR', () => {
+  const org = baseOrg({ suppliers: [{ id: 's1', name: 'م' }] });
+  const ops = { closings: [closing({ id: 'a', status: 'approved' }), closing({ id: 'b', date: '2026-03-11', branchId: 'b2', branchName: 'العليا' })],
+    invoices: [{ id: 'i1', supplierId: 's1', supplierName: 'م', amount: 1150, taxable: true, date: '2026-03-05', paidAmount: 0 }],
+    journalManual: [{ id: 'j1', date: '2026-03-20', title: 'إيجار', lines: [{ code: '5901', debit: 300, credit: 0 }, { code: '1201', debit: 0, credit: 300 }] }] };
+  const A = E.buildAccounting(org, ops); assert.equal(A.balanced, true);
+  const t = tb(A), act = E.acctActivity(A, { from: '2026-03-01', to: '2026-03-31' });
+  assert.equal(act.balanced, true, 'حركة الحسابات متوازنة');
+  const dr = r2(A.entries.reduce((s, e) => s + e.lines.reduce((x, l) => x + l.debit, 0), 0));
+  near(act.debit, dr, 'إجمالي المدين في التقرير = مجموع مدين القيود');
+  act.rows.forEach(r => { const g = E.glLedger(A, r.code, { from: '2026-03-01', to: '2026-03-31' });
+    near(g.close, r.close, 'دفتر الأستاذ = حركة الحسابات للحساب ' + r.code);
+    const n = ['asset', 'exp'].includes(r.kind) ? 1 : -1; near(r.close, n * (t[r.code] || 0), 'الختامي = الميزان للحساب ' + r.code); });
+  const spec = (lang) => ({ title: 'حركة الحسابات', lang, columns: [{ key: 'code', label: 'الحساب', en: 'Account' }, { key: 'debit', label: 'مدين', en: 'Debit', type: 'money', total: 'sum' }, { key: 'credit', label: 'دائن', en: 'Credit', type: 'money', total: 'sum' }], rows: act.rows });
+  const T = E.rptTotals(spec('ar')); near(T.debit, act.debit, 'إجمالي التقرير المطبوع'); near(T.credit, act.credit);
+  const ar = E.rptHtml(org, spec('ar')), en = E.rptHtml(org, spec('en'));
+  assert.match(ar, /dir="rtl"/); assert.match(en, /dir="ltr"/);
+  assert.match(ar, /صفحة/); assert.match(en, /Page/); assert.match(ar, /اختبار/, 'ترويسة باسم المنشأة');
+  assert.ok(ar.includes(act.debit.toLocaleString('en-US', { minimumFractionDigits: 2 })), 'الإجمالي المطبوع بالأرقام نفسها');
+});

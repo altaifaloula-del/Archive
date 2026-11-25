@@ -3380,7 +3380,7 @@ function emptyOps() {
    ويُحفظ آخر 20 خطأ على الجهاز (للإرسال للدعم) — لا تتوقف المنصة كلها بسبب قسم واحد */
 const ERRLOG_KEY = 'mizan:errlog';
 // v38.5 — رقم الإصدار في مكان واحد (الشريط العلوي وسجل الأخطاء)
-const APP_VER = 'v55.0';
+const APP_VER = 'v56.0';
 // سياق المستخدم الحالي لسجل الأخطاء (يُضبط عند الدخول) — بلا بيانات تشغيل
 const ERR_CTX = { role: '', branchId: '' };
 const errSig = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); };
@@ -3438,7 +3438,7 @@ export { ErrorBoundary, logClientError, lockedLedgerChanged };
 export { posReturnable, posReturnCalc, posRefundOptions, posReturnHtml, saleRetUse, posReturnLoyDed };
 export { jeLive, jeOwner, canApproveJe, jeAutoSt, vatCloseLive, WF_DOCS, wfTiers, wfOn, wfRequired, poNeedsAppr, wfState, wfCanAct, wfApprove };   // v47.1 اعتماد القيد اليدوي
 export { gosiNewSched, gosiNewAuto };   // v47.2 الرواتب   // v46.8 مرتجع نقطة البيع   // v46.8: للاختبارات الوظيفية (حارس الإقفال)
-export { findDupClosings, clDayKey, clrKeyId, yearEndDates, yearEndNext, payFactor };   // v56.0 (GAP-002) الحارس المركزي لتكرار الإغلاق
+export { findDupClosings, clDayKey, clrKeyId, yearEndDates, yearEndNext, payFactor, POS_HOLD_MAX, posHolds, posHoldsSet, posHoldPut, posHoldRecall };   // v56.0 (GAP-002) الحارس المركزي لتكرار الإغلاق
 if (typeof window !== 'undefined' && !window.__mizanErrHook) {
   window.__mizanErrHook = true;
   window.addEventListener('error', (e) => logClientError(e.error || e.message, 'window'));
@@ -8399,6 +8399,28 @@ async function loyPost(txs) {
 }
 const posQueue = () => { try { return JSON.parse(localStorage.getItem(POS_Q_KEY) || '[]'); } catch { return []; } };
 const posQueueSet = (a) => { try { localStorage.setItem(POS_Q_KEY, JSON.stringify(a)); } catch { } };
+/* v56.0 (GAP-007): تعليق طلب سفري واستدعاؤه — مسودة على الجهاز لكل فرع (تعمل دون اتصال)، لا رقم فاتورة ولا عدّاد ولا بصمة
+   قبل الدفع، فتبقى سلسلة الفوترة الإلكترونية بلا فجوات. الاستدعاء يعيد التسعير بسعر المنتج الحالي ويُسقط المنتج المحذوف. */
+const POS_HOLD_MAX = 20;
+const posHoldKey = (b) => 'mizan:posHold:' + (b || '');
+const posHolds = (b) => { try { const a = JSON.parse(localStorage.getItem(posHoldKey(b)) || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
+const posHoldsSet = (b, a) => { try { localStorage.setItem(posHoldKey(b), JSON.stringify(a)); return true; } catch { return false; } };
+/** إضافة طلب معلّق: { list } أو { err } — لا سلة فارغة، وبحد أقصى POS_HOLD_MAX */
+function posHoldPut(list, h) {
+  const L = Array.isArray(list) ? list : [];
+  if (!h || !Array.isArray(h.cart) || !h.cart.length) return { err: 'السلة فارغة' };
+  if (L.length >= POS_HOLD_MAX) return { err: 'بلغت الطلبات المعلّقة الحد (' + POS_HOLD_MAX + ') — استدعِ أحدها أو احذفه' };
+  return { list: [h, ...L] };
+}
+/** استدعاء: السلة بأسعار المنتجات الحالية، وما حُذف من المنتجات يُسقط ويُبلَّغ عنه */
+function posHoldRecall(h, prods) {
+  const P = new Map((prods || []).map(p => [p.id, p])), cart = [], dropped = [], repriced = [];
+  ((h && h.cart) || []).forEach(l => { const p = P.get(l.productId);
+    if (!p) { dropped.push(l.name || l.productId); return; }
+    const price = Number(p.sellPrice) || 0; if (Math.abs(price - (Number(l.price) || 0)) > 0.0001) repriced.push(l.name || p.name);
+    cart.push({ ...l, price, name: p.name || l.name }); });
+  return { cart, dropped, repriced };
+}
 const posR2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 // إجماليات الطلب: الأسعار شاملة الضريبة؛ الخصم من الإجمالي؛ الضريبة = الإجمالي × النسبة ÷ (100 + النسبة)
 function posTotals(lines, discount, rate) {
