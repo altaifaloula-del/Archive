@@ -80,3 +80,8 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 - 20 اختصارًا من 4–5 أحرف (tiba, sibra, tibra, raba, isba, sabra, ibsa…): **كلها .com محجوزة** — كل تركيبات الأحرف الأربعة في .com مسجلة.
 - SIBRA: مستعمل (Sibra أوروغواي لبرمجيات ERP/مالية، SIBRA GmbH ألمانية) ⇒ مستبعد.
 - **TIBA** (Trusted Integrated Business Accounting / «طيبة»): لا شركة برمجيات بالاسم في السعودية ومصر؛ tiba.com وgettiba.com وtibacloud.com محجوزة؛ **tibaerp.com متاح**.
+
+## اختصارات إضافية
+- WAFI: قريب جدًا من Wafeq ⇒ مستبعد. ZAHI: ZAHI Technologies (ERP هندي) + Zahir ERP ⇒ مستبعد.
+- MIZA: تطبيق ميزانية شخصية بالاسم ⇒ متوسط.
+- MAJD: لا شركة برمجيات؛ لكن «مجد للتنمية والاستثمار» (مجموعة المجدوعي) اسم تجاري سعودي قائم ⇒ متوسط.
