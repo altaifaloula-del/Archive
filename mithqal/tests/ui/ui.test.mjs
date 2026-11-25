@@ -3285,3 +3285,39 @@ test('v55.0 الرئيسية «التطبيقات أولًا»: شريط علو�
     assert.deepEqual(errs, []); await ctx.close();
   }
 });
+
+test('v56.0 GAP-018 العمل دون اتصال ثم المزامنة: فواتير بترقيم وسلسلة بصمة على الجهاز، تبقى بعد إعادة فتح الصفحة، وتُرفع مرة واحدة بلا تكرار', async () => {
+  const { p, errs, ctx } = await open({ viewport: { width: 1300, height: 1000 } }, 'live/PosApp/cs');
+  await p.evaluate(() => {
+    localStorage.removeItem('mizan:posQueue'); localStorage.removeItem('mizan:posShiftLocal');
+    window.setOrg(g => ({ ...g, taxCfg: { enabled: false }, posCfg: { branches: ['b1'], autoPrint: false }, products: [{ id: 'k', name: 'كبسة', sellPrice: 100, cat: 'رئيسي' }] }));
+    window.setOps(o => ({ ...o, posOrders: [], posShifts: [] }));
+  }); await p.waitForTimeout(400);
+  // انقطاع فعلي: المتصفح دون شبكة، والسحابة لا تقبل الحفظ
+  await ctx.setOffline(true); await p.evaluate(() => { window.__cloudDown = true; });
+  const ob = p.locator('button:has-text("فتح الوردية")'); if (await ob.count()) { await ob.click(); await p.waitForTimeout(400); }
+  const sell = async () => { await p.locator('.pos-tile:has-text("كبسة")').click(); await p.click('.pos-cart button:has-text("نقدي")'); await p.waitForTimeout(200);
+    await p.click('.modal button:has-text("تأكيد")'); await p.waitForTimeout(500); };
+  await sell(); await sell(); await sell();
+  const q = await p.evaluate(() => JSON.parse(localStorage.getItem('mizan:posQueue') || '[]'));
+  assert.equal(q.length, 3, 'ثلاث فواتير في طابور الجهاز');
+  assert.equal(await p.evaluate(() => window.cur.posOrders.length), 0, 'لم يصل شيء للسحابة');
+  assert.ok(await p.evaluate(() => window.__downTries > 0), 'حاول الرفع وفشل بصدق');
+  assert.deepEqual(q.map(o => o.icv), [q[0].icv, q[0].icv + 1, q[0].icv + 2], 'عدّاد الفواتير متسلسل');
+  assert.equal(q[1].pih, q[0].hash); assert.equal(q[2].pih, q[1].hash, 'كل فاتورة تحمل بصمة سابقتها');
+  assert.equal(new Set(q.map(o => o.no)).size, 3, 'أرقام فريدة');
+  // إعادة فتح التطبيق والسحابة ما زالت غير متاحة: الطابور باقٍ على الجهاز
+  await ctx.setOffline(false); await ctx.addInitScript(() => { window.__cloudDown = true; });
+  await p.reload(); await p.waitForTimeout(500); await settle(p);
+  await p.evaluate(() => { window.setOrg(g => ({ ...g, taxCfg: { enabled: false }, posCfg: { branches: ['b1'], autoPrint: false }, products: [{ id: 'k', name: 'كبسة', sellPrice: 100, cat: 'رئيسي' }] })); }); await p.waitForTimeout(300);
+  assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('mizan:posQueue') || '[]').length), 3, 'الطابور بعد إعادة الفتح');
+  // تعارض: الفاتورة الأولى وصلت السحابة سابقًا وضاع الرد (أو رفعها تبويب آخر) — لا تُكرَّر
+  await p.evaluate((first) => { window.setOps(o => ({ ...o, posOrders: [first], posShifts: [] })); }, q[0]); await p.waitForTimeout(200);
+  await p.evaluate(() => { window.__cloudDown = false; window.dispatchEvent(new Event('online')); });
+  await p.waitForFunction(() => JSON.parse(localStorage.getItem('mizan:posQueue') || '[]').length === 0, null, { timeout: 8000 });
+  const ids = await p.evaluate(() => window.cur.posOrders.map(o => o.id));
+  assert.equal(ids.length, 3, 'ثلاث فواتير بالضبط'); assert.deepEqual(new Set(ids), new Set(q.map(o => o.id)), 'نفس الفواتير');
+  assert.equal(await p.evaluate(() => window.cur.posOrders.reduce((s, o) => s + o.total, 0)), 300, 'المجموع 3 × 100');
+  assert.ok(await p.evaluate(() => (window.cur.posShifts || []).length >= 1), 'الوردية المحلية رُفعت');
+  assert.deepEqual(errs, []); await ctx.close();
+});

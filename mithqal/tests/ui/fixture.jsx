@@ -52,14 +52,17 @@ const [kind, a, b, c] = decodeURIComponent(location.hash.slice(1)).replace('&dar
 const base = { org, myBranches: B, branches: B, commitOrg: async () => true, say: (x) => { window.lastSay = x; }, setTab: (t) => { window.__nav = 'tab:' + t; }, onClose: () => {}, onStartNew: () => {}, theme: 'mizan', online: [], pulse: {}, openAcctView: (v) => { window.__nav = 'acct:' + v; }, openInvView: () => {} };
 class EB extends React.Component { constructor(p) { super(p); this.state = { e: null }; } componentDidCatch(e) { window.__crash = String(e && e.message); this.setState({ e }); } render() { return this.state.e ? React.createElement('div', { id: 'crash' }, 'CRASH: ' + this.state.e.message) : this.props.children; } }
 function Live() {
-  const [o, setO] = React.useState(ops); window.cur = o; const [who, setWho] = React.useState(b || 'admin'); window.as = setWho;
-  const [g, setG] = React.useState(org); window.curOrg = g; window.setOps = setO; window.setOrg = setG;   // v39.0: حقن بيانات للاختبار
+  const [o, setO] = React.useState(ops); window.cur = o;
+  // v56.0: الحفظ يبني على أحدث حالة (كما يقرأ writeOps أحدث نسخة سحابية) — كان يبني على نسخة الرسم الأخيرة فيمحو حفظٌ تالٍ في الدورة نفسها سابقَه
+  const oRef = React.useRef(o); oRef.current = o; const setO2 = (v) => { oRef.current = typeof v === 'function' ? v(oRef.current) : v; setO(oRef.current); }; const [who, setWho] = React.useState(b || 'admin'); window.as = setWho;
+  const [g, setG] = React.useState(org); window.curOrg = g; window.setOps = setO2; window.setOrg = setG;   // v39.0: حقن بيانات للاختبار
   const [hv, setHv] = React.useState(c); window.hub = setHv;   // تنقّل بين المراكز مع بقاء البيانات
-  const commit = async (fn) => { try { const nx0 = fn(JSON.parse(JSON.stringify(o))); const nx1 = ME[who].branchId ? nx0 : M.syncPoInbox(g, nx0); const nx = M.dedupeSameId(o, M.assignVouchers(g, o, M.syncSaleMoves(g, o, nx1)));
+  // v56.0 (GAP-018): window.__cloudDown يحاكي تعذّر الوصول للسحابة (الحفظ يفشل بصدق كما في writeOps دون اتصال)
+  const commit = async (fn) => { if (window.__cloudDown) { window.__downTries = (window.__downTries || 0) + 1; return false; } const o = oRef.current; try { const nx0 = fn(JSON.parse(JSON.stringify(o))); const nx1 = ME[who].branchId ? nx0 : M.syncPoInbox(g, nx0); const nx = M.dedupeSameId(o, M.assignVouchers(g, o, M.syncSaleMoves(g, o, nx1)));
     // v49.1: الحارسان المركزيان كما في writeOps — الرصيد السالب والتكرار
     const ng = M.negStockChanges(g, o, nx); if (ng.length) { window.lastSay = 'لم يُحفظ — ' + M.negStockMsg(g, ng); return false; }
     const dp = M.findRecentDups(o, nx); if (dp.length) { window.lastSay = 'لم يُحفظ — ' + dp[0].msg; return false; }
-    setO(nx); return true; } catch (e) { window.lastErr = e.message; return false; } };
+    setO2(nx); return true; } catch (e) { window.lastErr = e.message; return false; } };
   const commitOrg = async (fn) => { try { const nx = fn(JSON.parse(JSON.stringify(g))); setG(nx); return true; } catch (e) { window.lastErr = e.message; return false; } };
   const myB = ME[who].branchId ? B.filter(x => x.id === ME[who].branchId) : B;   // فريق الفرع يرى فرعه فقط
   const P = { ...base, myBranches: myB, branches: myB, org: g, ops: o, scoped: o, me: ME[who], commit, commitOrg, invIntent: hv ? { v: hv, ts: 1 } : null, acctIntent: a === 'Accounting' && hv ? { v: hv, ts: 1 } : null };
