@@ -2605,7 +2605,7 @@ test('v50.2 الواجهة العربية لا تحمّل حزمة الترجم�
   assert.deepEqual(errs, []); await ctx.close();
 });
 
-test('v50.3→v56.0 الهوية الرسمية: الرمز الهندسي المعتمد (قرار المالك v56: Refine) والشعار الثنائي بنص حيّ (عربي/إنجليزي)', async () => {
+test('v50.3→v56.0 (إعادة التسمية) الهوية الرسمية: رمز البوصلة لمُكتسَب (قرار المالك 2026-11-25) والشعار الثنائي بنص حيّ (عربي/إنجليزي)', async () => {
   for (const lang of ['ar', 'en']) {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } }); await ctx.addInitScript((l) => { try { localStorage.setItem('rms8:lang', l); } catch { } }, lang);
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
@@ -2614,11 +2614,12 @@ test('v50.3→v56.0 الهوية الرسمية: الرمز الهندسي ال�
       return { v: sv && sv.dataset.mqSymbol, d: sv ? [...sv.querySelectorAll('polygon')].map(x => x.getAttribute('points')) : [], paths: sv ? sv.querySelectorAll('path').length : -1,
         c: sv ? [...sv.querySelectorAll('polygon')].map(x => getComputedStyle(x).fill) : [], t: lk ? lk.innerText.replace(/\s+/g, ' ') : '' }; });
     assert.equal(r.v, 'light');
-    // v56.0: الهندسة الموحّدة brand-geom.js — ساقان كحليتان وذراعان ذهبيان (مسطح، بلا خطوط)
-    assert.deepEqual(r.d, ['8,86 26,86 26,32 8,14', '92,14 74,32 74,86 92,86', '33,14 50,31 50,55 33,38', '67,38 50,55 50,31 67,14'], 'مضلعات الرمز مطابقة للحزمة');
+    // v56.0 (إعادة التسمية): الهندسة الموحّدة brand-geom.js — أربعة رؤوس قطرية خفيفة، ثم الجنوبي والشرقي والغربي (كحلي)، ثم الشمالي (ذهبي)
+    assert.deepEqual(r.d.slice(4), ['50,97 40.5,50 59.5,50', '97,50 50,40.5 50,59.5', '3,50 50,59.5 50,40.5', '50,3 59.5,50 40.5,50'], 'مضلعات الرمز مطابقة للحزمة');
+    assert.equal(r.d.length, 8, 'أربعة رؤوس قطرية + أربعة رئيسية');
     assert.equal(r.paths, 0, 'بلا مسارات خطية');
-    assert.deepEqual(r.c, ['rgb(16, 41, 74)', 'rgb(16, 41, 74)', 'rgb(217, 168, 62)', 'rgb(217, 168, 62)'], 'ألوان الحزمة #10294A و#D9A83E');
-    assert.match(r.t, /MUKTASAB/); assert.match(r.t, /مُكتسَب/, 'الاسم العربي يبقى عربيًا في الوضعين'); assert.match(r.t, /ERP/);
+    assert.deepEqual(r.c, [...Array(7).fill('rgb(16, 41, 74)'), 'rgb(217, 168, 62)'], 'ألوان الحزمة #10294A و#D9A83E (الشمال ذهبي)');
+    assert.match(r.t, /MUKTASAB/); assert.match(r.t, /مكتسب/, 'الاسم العربي يبقى عربيًا في الوضعين');
     assert.deepEqual(errs, []); await ctx.close();
   }
 });
