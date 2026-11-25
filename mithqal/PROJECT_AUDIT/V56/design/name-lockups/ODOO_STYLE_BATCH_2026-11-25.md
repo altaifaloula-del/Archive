@@ -85,3 +85,7 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 - WAFI: قريب جدًا من Wafeq ⇒ مستبعد. ZAHI: ZAHI Technologies (ERP هندي) + Zahir ERP ⇒ مستبعد.
 - MIZA: تطبيق ميزانية شخصية بالاسم ⇒ متوسط.
 - MAJD: لا شركة برمجيات؛ لكن «مجد للتنمية والاستثمار» (مجموعة المجدوعي) اسم تجاري سعودي قائم ⇒ متوسط.
+
+## دفعة مبتكرة ثالثة (name.com متاح شرط)
+- 29 اسمًا: متاح 12. استُبعد للمعنى: harmeko (harm)، samkera («سمكرة»)، kesmari (لفظ بذيء)، orleka (همزة)، delmika (قريب من DELMIA لبرمجيات التصنيع)، tazelra/qelmara/rabeeka (ثقيلة).
+- نظيفة في البحث: **mursina** (من «مرسى»)، **sarlimo**، **feldina**، **taqemo**.
