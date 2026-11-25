@@ -1,3 +1,4 @@
+import { mqSymbolShapes, mqPoints } from './brand-geom.js';   // v56.0 هندسة رمز MITHQAL
 import React, { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Target,
@@ -2816,19 +2817,17 @@ const readMode = () => { try { return localStorage.getItem('rms8:mode') === 'dar
 const themeCls = (t, mode) => { const n = normTheme(t); return 'rms mode-' + (mode === 'dark' ? 'dark' : 'light') + (n === 'restpro' ? ' thm-mizan thm-restpro' : ' thm-' + n); };
 // v46.8: الهوية «مِثقال — Mithqal» وشعارها؛ الترجمة الإنجليزية في i18n.js (TX)
 const BRAND = 'مِثقال', BRAND_SUB = 'منصة واحدة، لكل الأعمال ومن أي مكان', BRAND_AR = 'مِثقال — Mithqal';
-// v50.3 — هوية MITHQAL ERP الرسمية (حزمة الهوية المعتمدة من المالك 2026-11-19): رمز M كما هو بلا تعديل.
-// نسختان من الحزمة نفسها: «light» (كحلي + ذهبي — mithqal-symbol.svg) للخلفيات الفاتحة، و«dark» (ذهبي + أبيض — من mithqal-app-icon.svg) للكحلية.
-// الألوان من ملف التوكنات الموحّد brand/mithqal-brand-tokens.css (--mithqal-*) مع القيمة الرسمية احتياطًا.
+// v56.0 — رمز MITHQAL الهندسي (أمر التصميم v56.0: النموذج الأول — Refine · Geometric · Flat): كتلتان كحليتان وذراعان ذهبيان
+// من الهندسة الموحّدة brand-geom.js (المصدر نفسه لملفات brand/logo). نسختان: «light» (كحلي + ذهبي) و«dark» (أبيض + ذهبي) للخلفيات الكحلية.
+// الألوان من ملف التوكنات الموحّد brand/mithqal-brand-tokens.css (--mithqal-*) مع القيمة الرسمية احتياطًا. لا تغيّره أي منشأة.
 const MQ = { navy: 'var(--mithqal-navy,#10294A)', gold: 'var(--mithqal-gold,#D9A83E)', white: 'var(--mithqal-white,#FFFFFF)', deep: 'var(--mithqal-deep-navy,#091A30)' };
+const MQ_SHAPES = mqSymbolShapes();
 const BrandSymbol = ({ variant = 'light', size = '100%' }) => {
   const dark = variant === 'dark';
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true" style={{ display: 'block' }} data-mq-symbol={variant}>
-      <g fill="none" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 82 L18 24 L50 55 L82 24 L82 82" stroke={dark ? MQ.gold : MQ.navy} strokeWidth="11" />
-        <path d="M50 55 L50 82" stroke={dark ? MQ.white : MQ.gold} strokeWidth={dark ? 8 : 11} />
-        <path d="M31 24 L50 42 L69 24" stroke={MQ.gold} strokeWidth="7" />
-      </g>
+      {MQ_SHAPES.outer.map((p, i) => <polygon key={'o' + i} points={mqPoints(p)} fill={dark ? MQ.white : MQ.navy} />)}
+      {MQ_SHAPES.inner.map((p, i) => <polygon key={'i' + i} points={mqPoints(p)} fill={MQ.gold} />)}
     </svg>);
 };
 // أيقونة التطبيق (مربع كحلي برمز ذهبي وأبيض) — مطابقة لـ mithqal-app-icon.svg
