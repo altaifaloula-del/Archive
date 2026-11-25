@@ -595,12 +595,12 @@ function exportExcel(filename, sheetTitle, headers, rows, opts = {}) {
     <style>
       table{border-collapse:collapse;font-family:'IBM Plex Sans Arabic','Noto Sans Arabic','Segoe UI',Tahoma,sans-serif;direction:rtl}
       caption{font-size:15px;font-weight:bold;padding:10px;text-align:right}
-      th{background:#D9A83E;color:#10294A;font-weight:bold;border:1px solid #10294A;padding:7px 10px;text-align:center}
+      th{background:#E5E7EB;color:#111827;font-weight:bold;border:1px solid #9CA3AF;padding:7px 10px;text-align:center}
       td{border:1px solid #ccc;padding:6px 10px}
       td.n{mso-number-format:"#,##0.00";text-align:left}
       td.t{text-align:right}
       .meta{background:#F3F5F8;font-weight:bold;border:none;text-align:right}
-      .tot td{background:#10294A;color:#fff;font-weight:bold;border:1px solid #000}
+      .tot td{background:#1F2A37;color:#fff;font-weight:bold;border:1px solid #000}
     </style></head><body>
     <table><caption>${esc(sheetTitle)}</caption>
     ${metaRows}${thead}${tbody}${tfoot}</table></body></html>`;
@@ -830,6 +830,7 @@ function dirOf(org) {
   return {
     dirOnly: true,
     company: { name: (org.company || {}).name || '', logoUrl: (org.company || {}).logoUrl || '', activity: (org.company || {}).activity || '', taxNumber: (org.company || {}).taxNumber || '' },
+    branding: tbNorm(org.branding),   // v56.0: هوية المنشأة (بلا أسرار) — كي تطبع أجهزة الفروع الإيصالات والتقارير بهوية منشأتها
     // v34.0: ما تحتاجه نقطة البيع على أجهزة الفروع — الأصناف بأسعار البيع فقط (بلا تكلفة ولا وصفات)، الإعدادات، العروض، الولاء، الضريبة
     products: (org.products || []).map(p => ({ id: p.id, name: p.name, sellPrice: p.sellPrice || 0, cat: p.cat || '', ...(p.posOff ? { posOff: true } : {}), ...(p.disc ? { disc: p.disc } : {}), ...(p.img ? { img: p.img } : {}) })),   // v45.4: صورة المنتج المصغّرة لنقطة البيع
     posCfg: org.posCfg || {}, posPromos: org.posPromos || [], loyaltyCfg: org.loyaltyCfg || {}, mkt: { loy: ((org.mkt || {}).loy) || {}, seg: ((org.mkt || {}).seg) || {}, approveDiscPct: (org.mkt || {}).approveDiscPct },   // v48.1 إعداد الولاء المتقدم وقواعد الشرائح (بلا أسرار)
@@ -1734,40 +1735,129 @@ function rptFlat(spec) {
 function rptTotals(spec) { const t = {}; (spec.columns || []).forEach(c => { if (c.total === 'sum') t[c.key] = Math.round(rptFlat(spec).filter(r => r._k === 'row').reduce((a, r) => a + (Number(r[c.key]) || 0), 0) * 1000) / 1000; }); return t; }
 const rptLbl = (spec, c) => spec.lang === 'en' && c.en ? c.en : c.label;
 /** HTML الطباعة الموحد: ترويسة بالشعار والهوية، رأس جدول يتكرر في كل صفحة، ترقيم صفحات، وتذييل بالوقت والمستخدم والمصدر */
-function rptHtml(org, spec) {
-  const co = (org && org.company) || {}, en = spec.lang === 'en', dir = en ? 'ltr' : 'rtl', C = spec.columns || [], T = rptTotals(spec), anyTot = Object.keys(T).length > 0;
-  const paper = ['A4', 'A3', 'Letter'].includes(spec.paper) ? spec.paper : 'A4', orient = spec.orientation === 'landscape' ? 'landscape' : 'portrait';
+/* ============================================================
+   v56.0 — هوية المنشأة التجارية (Tenant Branding) — منفصلة تمامًا عن هوية المنصة MITHQAL
+   • org.branding تخص المنشأة وحدها (مستند منشأتها في مشروع Firebase الخاص بها — العزل مادي)، يكتبها مسؤول النظام فقط (القواعد: rms8_org).
+   • tbNorm يعقّم كل حقل (ألوان HEX فقط، صور https أو data:image بحد حجم، نصوص بأطوال قصوى) — لا يُخزَّن ولا يُطبع ما لم يمر به.
+   • tenantBrand يحلّ الهوية للاستعمال: الفرع (شعاره إن وُجد) ← هوية المنشأة ← بيانات الشركة القديمة (توافق رجعي).
+   • الألوان الافتراضية محايدة — لا تُفرض ألوان MITHQAL على مستندات المنشأة. شعار المنصة لا يمر من هنا إطلاقًا.
+   ============================================================ */
+const TB_HEX = /^#[0-9A-Fa-f]{6}$/;
+const TB_NEUTRAL = Object.freeze({ primary: '#1F2A37', accent: '#8A6D3B', heading: '#111827', text: '#1F2937' });
+const TB_TPL_INV = ['classic', 'modern', 'compact'], TB_TPL_RPT = ['standard', 'minimal', 'boxed'], TB_PAPER = ['A4', 'A3', 'Letter'];
+const TB_IMG_MAX = 400000;
+const tbImg = (v) => typeof v === 'string' && v.length <= TB_IMG_MAX && /^(https:\/\/[^\s"'<>()]+|data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/=]+)$/.test(v) ? v : '';
+const tbStr = (v, n) => typeof v === 'string' ? v.replace(/[<>]/g, '').trim().slice(0, n) : '';
+const tbHex = (v) => typeof v === 'string' && TB_HEX.test(v.trim()) ? v.trim().toUpperCase() : '';
+/** تعقيم إعدادات الهوية — يعيد كائنًا بالحقول المسموحة فقط */
+function tbNorm(raw) {
+  const r = raw && typeof raw === 'object' ? raw : {}, c = r.colors && typeof r.colors === 'object' ? r.colors : {}, pr = r.print && typeof r.print === 'object' ? r.print : {};
+  const colors = {}; ['primary', 'accent', 'heading', 'text'].forEach(k => { const h = tbHex(c[k]); if (h) colors[k] = h; });
+  const o = { nameAr: tbStr(r.nameAr, 120), nameEn: tbStr(r.nameEn, 120), logo: tbImg(r.logo), logoAlt: tbImg(r.logoAlt), logoDoc: tbImg(r.logoDoc), colors,
+    phone: tbStr(r.phone, 40), email: tbStr(r.email, 120), website: tbStr(r.website, 160), address: tbStr(r.address, 300), addressEn: tbStr(r.addressEn, 300),
+    header: tbStr(r.header, 300), footer: tbStr(r.footer, 400), footerEn: tbStr(r.footerEn, 400),
+    invoiceTpl: TB_TPL_INV.includes(r.invoiceTpl) ? r.invoiceTpl : 'classic', reportTpl: TB_TPL_RPT.includes(r.reportTpl) ? r.reportTpl : 'standard',
+    print: { paper: TB_PAPER.includes(pr.paper) ? pr.paper : 'A4', mono: pr.mono === true, showLogo: pr.showLogo !== false, showContact: pr.showContact !== false } };
+  if (typeof r.updatedAt === 'string') o.updatedAt = r.updatedAt.slice(0, 40);
+  if (typeof r.updatedBy === 'string') o.updatedBy = tbStr(r.updatedBy, 120);
+  return o;
+}
+/** الهوية المحلولة لمستند/شاشة: opt = { branchId, lang } */
+function tenantBrand(org, opt = {}) {
+  const O = org || {}, b = tbNorm(O.branding), co = O.company || {}, en = opt.lang === 'en';
+  const br = opt.branchId ? (O.branches || []).find(x => x.id === opt.branchId) || null : null;
+  const coLogo = tbImg(co.logoUrl), brLogo = br ? tbImg(br.logoUrl) : '';
+  const nameAr = b.nameAr || tbStr(co.name, 120), nameEn = b.nameEn;
+  return { nameAr, nameEn, name: en ? (nameEn || nameAr) : (nameAr || nameEn), altName: en ? (nameEn ? nameAr : '') : nameEn,
+    logo: b.logo || coLogo, logoAlt: b.logoAlt || b.logo || coLogo, logoDoc: brLogo || b.logoDoc || b.logo || coLogo,
+    colors: { ...TB_NEUTRAL, ...b.colors }, vat: tbStr(co.taxNumber, 30), cr: tbStr(co.commercialReg, 30),
+    address: en ? (b.addressEn || b.address || tbStr(co.address, 300)) : (b.address || tbStr(co.address, 300)),
+    phone: b.phone || tbStr(co.phone, 40), email: b.email || tbStr(co.email, 120), website: b.website,
+    header: b.header, footer: en ? (b.footerEn || b.footer) : (b.footer || b.footerEn),
+    invoiceTpl: b.invoiceTpl, reportTpl: b.reportTpl, print: b.print, branchName: br ? tbStr(br.name, 120) : '', custom: !!(O.branding && Object.keys(O.branding).length) };
+}
+/** متغيرات CSS للمستندات من هوية المنشأة؛ mono = طباعة أحادية (تدرج رمادي، والشعار رمادي) */
+/** شعار المستند المعقّم (الفرع ← المنشأة) — لقوالب الطباعة */
+const tbLogo = (org, branchId) => tenantBrand(org, { branchId }).logoDoc;
+function tbCss(B, opt = {}) {
+  const mono = opt.mono != null ? !!opt.mono : !!(B.print && B.print.mono), C = B.colors || TB_NEUTRAL;
+  const v = mono ? { p: '#222222', a: '#555555', h: '#000000', t: '#111111' } : { p: C.primary, a: C.accent, h: C.heading, t: C.text };
+  return `:root{--tb-p:${v.p};--tb-a:${v.a};--tb-h:${v.h};--tb-t:${v.t};--tb-soft:color-mix(in srgb,${v.p} 9%,#fff);--tb-line:color-mix(in srgb,${v.p} 22%,#fff)}${mono ? 'img.lg,img.logo{filter:grayscale(1)}' : ''}`;
+}
+/** ترويسة المستند الموحّدة بهوية المنشأة (شعار، اسمان، بيانات اتصال، رقم ضريبي) — HTML آمن */
+function tbHeadHtml(B, L) {
+  const logo = B.print.showLogo && B.logoDoc ? `<img class="lg" src="${_xe(B.logoDoc)}" alt="">` : '';
+  const contact = B.print.showContact ? [B.vat ? L.vat + ': ' + _xe(B.vat) : '', B.cr ? (L.cr || 'CR') + ': ' + _xe(B.cr) : '', _xe(B.address || ''), _xe(B.phone || ''), _xe(B.email || ''), _xe(B.website || '')].filter(Boolean).join(' · ') : (B.vat ? L.vat + ': ' + _xe(B.vat) : '');
+  return `<div class="l">${logo}<div><div class="co">${_xe(B.name || '')}</div>${B.altName ? `<div class="co2">${_xe(B.altName)}</div>` : ''}${B.branchName ? `<div class="s">${_xe(B.branchName)}</div>` : ''}<div class="s">${contact}</div>${B.header ? `<div class="s">${_xe(B.header)}</div>` : ''}</div></div>`;
+}
+/* v56.0 — القوالب الستة على المحرك نفسه (لا محرك موازٍ) وبمعرّفاتها القائمة: التصميم منفصل عن البيانات — كل قالب يعرض صفوف المواصفة كما هي.
+   list قائمة · statement (Financial) مالي بمستويات وخط إجمالي مزدوج · ledger (Statement) كشف بافتتاحي/ختامي · summary ملخص بمؤشرات بارزة
+   document (Official) مستند رسمي باعتماد وتوقيع وختم · matrix (Pivot) جدول محوري يجمع قيم الصفوف المعطاة صفًا×عمودًا — عرض فقط */
+// المعرّفات القائمة (v50) لا تتغير؛ أسماء أمر التصميم v56.0 أسماء بديلة: Financial = statement · Statement = ledger · Pivot = matrix
+const RPT_TPL_ALIAS = { financial: 'statement', pivot: 'matrix', official: 'document' };
+const rptTpl = (t) => { const k = RPT_TPL_ALIAS[t] || t; return RPT_TEMPLATES[k] ? k : 'list'; };
+/** الجدول المحوري: يعيد مواصفة أعمدة/صفوف من spec.pivot = { row, col, val, rowLabel, valType } — مجموع val لكل (row, col) وإجماليات */
+function rptPivot(spec) {
+  const P = spec.pivot || {}, R = spec.rows || [], cols = [...new Set(R.map(r => String(r[P.col] ?? '')))].sort();
+  const acc = new Map(); R.forEach(r => { const rk = String(r[P.row] ?? ''), ck = String(r[P.col] ?? ''); const m = acc.get(rk) || {}; m[ck] = Math.round(((m[ck] || 0) + (Number(r[P.val]) || 0)) * 1000) / 1000; acc.set(rk, m); });
+  const t = P.valType || 'money';
+  const columns = [{ key: '_r', label: P.rowLabel || P.row, en: P.rowLabelEn }, ...cols.map((c, i) => ({ key: '_c' + i, label: c, type: t, total: 'sum' })), { key: '_t', label: 'الإجمالي', en: 'Total', type: t, total: 'sum' }];
+  const rows = [...acc.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([rk, m]) => { const o = { _r: rk }; let tot = 0; cols.forEach((c, i) => { o['_c' + i] = m[c] || 0; tot += m[c] || 0; }); o._t = Math.round(tot * 1000) / 1000; return o; });
+  return { ...spec, columns, rows, groups: [] };
+}
+function rptHtml(org, spec0) {
+  const tpl = rptTpl(spec0.template);
+  const spec = tpl === 'matrix' && spec0.pivot ? rptPivot(spec0) : spec0;
+  const en = spec.lang === 'en', dir = en ? 'ltr' : 'rtl', C = spec.columns || [], T = rptTotals(spec), anyTot = Object.keys(T).length > 0;
   const meta = { user: _rptCtx.user, ...(spec.meta || {}) }, at = meta.at || new Date().toISOString();
-  const L = en ? { by: 'Printed by', at: 'at', src: 'Source', page: 'Page', of: 'of', vat: 'VAT No.', tot: 'Total', filt: 'Filters', none: 'No data' } : { by: 'طبعه', at: 'في', src: 'المصدر', page: 'صفحة', of: 'من', vat: 'الرقم الضريبي', tot: 'الإجمالي', filt: 'التصفية', none: 'لا بيانات' };
+  const B = tenantBrand(org, { lang: spec.lang, branchId: meta.branchId });   // v56.0: هوية المنشأة هي الهوية البصرية للتقرير
+  const paper = ['A4', 'A3', 'Letter'].includes(spec.paper) ? spec.paper : B.print.paper, orient = spec.orientation === 'landscape' ? 'landscape' : 'portrait';
+  const mono = spec.mono != null ? !!spec.mono : B.print.mono;
+  const L = en ? { by: 'Printed by', at: 'at', src: 'Source', page: 'Page', of: 'of', vat: 'VAT No.', cr: 'CR', tot: 'Total', filt: 'Filters', none: 'No data', open: 'Opening balance', close: 'Closing balance', period: 'Period', prep: 'Prepared by', appr: 'Approved by', stamp: 'Stamp' }
+    : { by: 'طبعه', at: 'في', src: 'المصدر', page: 'صفحة', of: 'من', vat: 'الرقم الضريبي', cr: 'السجل التجاري', tot: 'الإجمالي', filt: 'التصفية', none: 'لا توجد بيانات', open: 'الرصيد الافتتاحي', close: 'الرصيد الختامي', period: 'الفترة', prep: 'أعدّه', appr: 'اعتمده', stamp: 'الختم' };
   const cell = (r, c) => { const v = r[c.key]; const neg = rptIsNum(c) && Number(v) < 0; return `<td class="${rptIsNum(c) ? 'n' : ''}${neg ? ' neg' : ''}">${_xe(rptFmt(v, c))}</td>`; };
+  const balRow = (lbl, val, cls) => val == null ? '' : `<tr class="${cls}"><td colspan="${Math.max(1, C.length - 1)}">${_xe(lbl)}</td>${cell({ v: val }, { key: 'v', type: 'money' })}</tr>`;
   const rows = rptFlat(spec).map(r => r._k === 'head' ? `<tr class="gh"><td colspan="${C.length}">${_xe(r._label)}</td></tr>`
     : r._k === 'sub' ? `<tr class="sub"><td>${_xe(r._label)}</td>${C.slice(1).map(c => c.total === 'sum' ? cell(r, c) : '<td></td>').join('')}</tr>`
     : `<tr${r._bold ? ' class="b"' : ''}>${C.map((c, i) => i === 0 && r._level ? `<td style="padding-inline-start:${8 + r._level * 14}px">${_xe(rptFmt(r[c.key], c))}</td>` : cell(r, c)).join('')}</tr>`).join('');
-  const kpis = (spec.kpis || []).length ? `<div class="kp">${spec.kpis.map(k => `<div><small>${_xe(k.label)}</small><b>${_xe(k.value)}</b></div>`).join('')}</div>` : '';
-  const filt = !(spec.filters || []).length ? '' : spec.template === 'document' ? `<div class="fl">${spec.filters.map(([k, v]) => '<b>' + _xe(k) + ':</b> ' + _xe(v)).join(' &nbsp;·&nbsp; ')}</div>` : `<div class="fl"><b>${L.filt}:</b> ${spec.filters.map(([k, v]) => _xe(k) + ': ' + _xe(v)).join(' · ')}</div>`;
-  const sig = (spec.signatures || []).length ? `<div class="sign">${spec.signatures.map(s => `<div>${_xe(s)}</div>`).join('')}</div>` : '';
-  const logo = co.logoUrl && /^(https:|data:image\/)/.test(co.logoUrl) ? `<img class="lg" src="${_xe(co.logoUrl)}" alt="">` : '';
+  const kpis = (spec.kpis || []).length ? `<div class="kp">${spec.kpis.map(k => `<div><small>${_xe(k.label)}</small><b>${_xe(k.value)}</b>${k.delta != null ? `<i class="${String(k.delta).trim().startsWith('-') ? 'dn' : 'up'}">${_xe(k.delta)}</i>` : ''}</div>`).join('')}</div>` : '';
+  const filt = !(spec.filters || []).length ? '' : tpl === 'document' ? `<div class="fl">${spec.filters.map(([k, v]) => '<b>' + _xe(k) + ':</b> ' + _xe(v)).join(' &nbsp;·&nbsp; ')}</div>` : `<div class="fl"><b>${L.filt}:</b> ${spec.filters.map(([k, v]) => _xe(k) + ': ' + _xe(v)).join(' · ')}</div>`;
+  const sigs = (spec.signatures || []).length ? spec.signatures : tpl === 'document' ? [L.prep, L.appr] : [];
+  const sig = sigs.length ? `<div class="sign">${sigs.map(x => `<div>${_xe(x)}</div>`).join('')}${tpl === 'document' ? `<div class="stamp">${L.stamp}</div>` : ''}</div>` : '';
   const foot = `${L.by}: ${_xe(meta.user || '—')} · ${L.at} ${_xe(dtLocal(at))} · ${L.src}: ${_xe(meta.source || 'مِثقال')}`;
-  return `<!doctype html><html dir="${dir}" lang="${en ? 'en' : 'ar'}"><head><meta charset="utf-8"><title>${_xe(spec.title)}</title><style>${typeof NUM_FACE === 'string' ? NUM_FACE : ''}
+  const tfoot = B.footer ? `<div class="tf">${_xe(B.footer)}</div>` : '';
+  const left = en ? 'right' : 'left';
+  return `<!doctype html><html dir="${dir}" lang="${en ? 'en' : 'ar'}"><head><meta charset="utf-8"><title>${_xe(spec.title)}</title><style>${typeof NUM_FACE === 'string' ? NUM_FACE : ''}${tbCss(B, { mono })}
   @page{size:${paper} ${orient};margin:14mm 10mm 16mm;@bottom-center{content:"${L.page} " counter(page) " ${L.of} " counter(pages);font-size:9px;color:#777}@bottom-${en ? 'left' : 'right'}{content:"${foot.replace(/"/g, "'")}";font-size:8px;color:#888}}
-  *{font-family:'MizanNum','IBM Plex Sans Arabic','Noto Sans Arabic','Segoe UI',Tahoma,sans-serif;box-sizing:border-box}body{margin:0;color:#1a1a1a;font-size:11.5px}
-  .h{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:2px solid #10294A;padding-bottom:8px;margin-bottom:10px}
-  .h .l{display:flex;gap:10px;align-items:center}.lg{height:46px;max-width:120px;object-fit:contain}.co{font-size:16px;font-weight:800;color:#10294A}.s{font-size:10.5px;color:#666;margin-top:2px}
-  h1{font-size:15px;margin:0;text-align:${en ? 'right' : 'left'}}.tp{font-size:10px;color:#10294A;text-align:${en ? 'right' : 'left'}}
-  .fl{font-size:10.5px;background:#F3F5F8;border:1px solid #DDE2EA;border-radius:6px;padding:5px 9px;margin-bottom:8px}
-  .kp{display:grid;grid-template-columns:repeat(${Math.min(4, (spec.kpis || []).length || 1)},1fr);gap:8px;margin-bottom:10px}.kp div{border:1px solid #DDE2EA;border-radius:6px;padding:6px 8px}.kp small{display:block;color:#777;font-size:9.5px}.kp b{font-size:13px}
-  table{width:100%;border-collapse:collapse}thead{display:table-header-group}tfoot{display:table-row-group}tr{page-break-inside:avoid}
-  th{background:#E9EDF3;color:#10294A;padding:6px;border:1px solid #CBD3DF;text-align:start;font-size:10.5px}
-  td{padding:5px 7px;border:1px solid #DDE2EA}.n{text-align:${en ? 'right' : 'left'};direction:ltr;font-variant-numeric:tabular-nums;white-space:nowrap}.neg{color:#C0392B}
-  .gh td{background:#F1F4F8;font-weight:800;color:#10294A}.sub td{background:#F7F8FA;font-weight:700}.b td{font-weight:700}.tot td{background:#f2ead6;font-weight:800;border-top:2px solid #10294A}
-  .nt{font-size:10px;color:#666;margin-top:8px}.sign{display:flex;justify-content:space-around;margin-top:36px;text-align:center;font-size:11px}.sign div{border-top:1px solid #999;padding-top:6px;min-width:140px}
-  .ft{display:none}@media screen{body{padding:22px}.ft{display:block;margin-top:12px;font-size:9.5px;color:#888;text-align:center}}</style></head><body data-rpt="${_xe(spec.id || '')}" data-template="${_xe(spec.template || 'list')}">
-  <div class="h"><div class="l">${logo}<div><div class="co">${_xe(co.name || '')}</div><div class="s">${co.taxNumber ? L.vat + ': ' + _xe(co.taxNumber) : ''}${co.address ? ' · ' + _xe(co.address) : ''}</div></div></div>
-  <div><h1>${_xe(spec.title)}</h1><div class="s" style="text-align:inherit">${_xe(spec.sub || '')}</div><div class="s" style="text-align:inherit" data-issued>${en ? 'Issued: ' : 'تاريخ ووقت الإصدار: '}${_xe(dtLocal(at))}</div></div></div>
+  *{font-family:'MizanNum','IBM Plex Sans Arabic','Noto Sans Arabic',Manrope,'Segoe UI',Tahoma,sans-serif;box-sizing:border-box}body{margin:0;color:var(--tb-t);font-size:11.5px}
+  .h{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:2px solid var(--tb-p);padding-bottom:8px;margin-bottom:10px}
+  .h .l{display:flex;gap:10px;align-items:center}.lg{height:46px;max-width:120px;object-fit:contain}.co{font-size:16px;font-weight:800;color:var(--tb-h)}.co2{font-size:12px;font-weight:700;color:var(--tb-a)}.s{font-size:10.5px;color:#666;margin-top:2px}
+  h1{font-size:15px;margin:0;text-align:${left};color:var(--tb-h)}.tp{font-size:10px;color:var(--tb-p);text-align:${left}}
+  .fl{font-size:10.5px;background:var(--tb-soft);border:1px solid var(--tb-line);border-radius:6px;padding:5px 9px;margin-bottom:8px}
+  .kp{display:grid;grid-template-columns:repeat(${Math.min(4, (spec.kpis || []).length || 1)},1fr);gap:8px;margin-bottom:10px}.kp div{border:1px solid var(--tb-line);border-top:3px solid var(--tb-a);border-radius:6px;padding:6px 8px}.kp small{display:block;color:#777;font-size:9.5px}.kp b{font-size:13px;color:var(--tb-h)}.kp i{display:block;font-style:normal;font-size:9.5px}.kp .up{color:#1E7A52}.kp .dn{color:#B3372E}
+  table{width:100%;border-collapse:collapse}thead{display:table-header-group}tfoot{display:table-row-group}tr{page-break-inside:avoid;break-inside:avoid}
+  th{background:var(--tb-soft);color:var(--tb-h);padding:6px;border:1px solid var(--tb-line);text-align:start;font-size:10.5px}
+  td{padding:5px 7px;border:1px solid #DDE2EA}.n{text-align:${left};direction:ltr;font-variant-numeric:tabular-nums;white-space:nowrap}.neg{color:#B3372E}
+  .gh td{background:var(--tb-soft);font-weight:800;color:var(--tb-h)}.sub td{background:#F7F8FA;font-weight:700}.b td{font-weight:700}.tot td{background:color-mix(in srgb,var(--tb-a) 14%,#fff);font-weight:800;border-top:2px solid var(--tb-p)}
+  .ob td,.cb td{font-weight:700;background:#F7F8FA}
+  .nt{font-size:10px;color:#666;margin-top:8px}.sign{display:flex;justify-content:space-around;margin-top:36px;text-align:center;font-size:11px;break-inside:avoid}.sign div{border-top:1px solid #999;padding-top:6px;min-width:140px}
+  .sign .stamp{border:1px dashed #aaa;border-radius:50%;width:92px;height:92px;min-width:0;display:flex;align-items:center;justify-content:center;color:#999}
+  .tf{margin-top:12px;padding-top:6px;border-top:1px solid var(--tb-line);font-size:9.5px;color:#666;text-align:center}
+  /* القوالب */
+  body[data-template=statement] .tot td{border-top:3px double var(--tb-p);border-bottom:3px double var(--tb-p)}body[data-template=statement] td{border-inline:0;border-color:#E6E9EE}
+  body[data-template=summary] .kp{grid-template-columns:repeat(${Math.min(3, (spec.kpis || []).length || 1)},1fr)}body[data-template=summary] .kp b{font-size:18px}
+  body[data-template=document] .h{flex-direction:column;align-items:stretch;text-align:center}body[data-template=document] .h .l{justify-content:center}body[data-template=document] h1{text-align:center;font-size:18px;margin-top:8px}body[data-template=document] .hd2{text-align:center}
+  body[data-template=matrix] th.n,body[data-template=matrix] td.n{min-width:70px}body[data-template=ledger] td.n:last-child{font-weight:700}
+  /* أنماط هوية المنشأة */
+  body.rt-minimal .h{border-bottom-width:1px}body.rt-minimal th{background:#fff;border-inline:0}body.rt-minimal td{border-inline:0}
+  body.rt-boxed{outline:2px solid var(--tb-p);outline-offset:6mm}
+  .ft{display:none}@media screen{body{padding:22px}.ft{display:block;margin-top:12px;font-size:9.5px;color:#888;text-align:center}}</style></head><body class="rt-${_xe(B.reportTpl)}${mono ? ' mono' : ''}" data-rpt="${_xe(spec.id || '')}" data-template="${tpl}">
+  <div class="h">${tbHeadHtml(B, L)}
+  <div class="hd2"><h1>${_xe(spec.title)}</h1><div class="s" style="text-align:inherit">${_xe(spec.sub || '')}</div><div class="s" style="text-align:inherit" data-issued>${en ? 'Issued: ' : 'تاريخ ووقت الإصدار: '}${_xe(dtLocal(at))}</div></div></div>
   ${filt}${kpis}
-  ${C.length ? `<table><thead><tr>${C.map(c => `<th${rptIsNum(c) ? ' class="n"' : ''}>${_xe(rptLbl(spec, c))}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="${C.length}" style="text-align:center;color:#888">${L.none}</td></tr>`}</tbody>
+  ${C.length ? `<table><thead><tr>${C.map(c => `<th${rptIsNum(c) ? ' class="n"' : ''}>${_xe(rptLbl(spec, c))}</th>`).join('')}</tr></thead><tbody>${tpl === 'ledger' ? balRow(spec.openingLabel || L.open, spec.opening, 'ob') : ''}${rows || `<tr><td colspan="${C.length}" style="text-align:center;color:#888">${L.none}</td></tr>`}${tpl === 'ledger' ? balRow(spec.closingLabel || L.close, spec.closing, 'cb') : ''}</tbody>
   ${anyTot ? `<tfoot><tr class="tot"><td>${_xe(spec.totalLabel || L.tot)}</td>${C.slice(1).map(c => c.total === 'sum' ? cell(T, c) : '<td></td>').join('')}</tr></tfoot>` : ''}</table>` : ''}
-  ${(spec.notes || []).map(n => `<div class="nt">${_xe(n)}</div>`).join('')}${sig}
+  ${(spec.notes || []).map(n => `<div class="nt">${_xe(n)}</div>`).join('')}${sig}${tfoot}
   <div class="ft">${foot}</div></body></html>`;
 }
 function printReport(org, spec) {
@@ -1778,7 +1868,8 @@ function printReport(org, spec) {
 function rptXlsxRows(org, spec) {
   const co = (org && org.company) || {}, C = spec.columns || [], meta = spec.meta || {}, en = spec.lang === 'en';
   const rows = [], put = (arr) => rows.push(arr);
-  put([{ v: co.name || '', s: 4 }]); put([{ v: spec.title, s: 4 }]); if (spec.sub) put([spec.sub]);
+  const TBx = tenantBrand(org, { lang: spec.lang, branchId: meta.branchId });   // v56.0: اسم المنشأة من هويتها
+  put([{ v: TBx.name || co.name || '', s: 4 }]); put([{ v: spec.title, s: 4 }]); if (spec.sub) put([spec.sub]);
   if ((spec.filters || []).length) put([(en ? 'Filters: ' : 'التصفية: ') + spec.filters.map(([k, v]) => k + ': ' + v).join(' · ')]);
   put([(en ? 'Printed by ' : 'أعدّه ') + (meta.user || '—') + ' · ' + dtLocal(meta.at || new Date().toISOString()) + ' · ' + (meta.source || 'مِثقال')]);
   put([]);
@@ -3437,7 +3528,9 @@ export { ErrorBoundary, logClientError, lockedLedgerChanged };
 export { posReturnable, posReturnCalc, posRefundOptions, posReturnHtml, saleRetUse, posReturnLoyDed };
 export { jeLive, jeOwner, canApproveJe, jeAutoSt, vatCloseLive, WF_DOCS, wfTiers, wfOn, wfRequired, poNeedsAppr, wfState, wfCanAct, wfApprove };   // v47.1 اعتماد القيد اليدوي
 export { gosiNewSched, gosiNewAuto };   // v47.2 الرواتب   // v46.8 مرتجع نقطة البيع   // v46.8: للاختبارات الوظيفية (حارس الإقفال)
-export { findDupClosings, clDayKey, clrKeyId, yearEndDates, yearEndNext, payFactor, POS_HOLD_MAX, posHolds, posHoldsSet, posHoldPut, posHoldRecall };   // v56.0 (GAP-002) الحارس المركزي لتكرار الإغلاق
+export { findDupClosings, clDayKey, clrKeyId, yearEndDates, yearEndNext, payFactor, POS_HOLD_MAX, posHolds, posHoldsSet, posHoldPut, posHoldRecall };
+export { rptPivot, rptTpl, RPT_TPL_ALIAS };
+export { TB_NEUTRAL, TB_TPL_INV, TB_TPL_RPT, TB_PAPER, TB_IMG_MAX, tbNorm, tenantBrand, tbCss, tbHeadHtml, tbLogo, tbImg };   // v56.0 هوية المنشأة   // v56.0 (GAP-002) الحارس المركزي لتكرار الإغلاق
 if (typeof window !== 'undefined' && !window.__mizanErrHook) {
   window.__mizanErrHook = true;
   window.addEventListener('error', (e) => logClientError(e.error || e.message, 'window'));
@@ -7900,7 +7993,7 @@ function printSalesInvoice(org, x, orig) {
   const body = `
     <div class="box" style="display:flex;justify-content:space-between;align-items:flex-start;gap:18px">
       <div style="line-height:1.9">
-        <div style="font-size:15px;font-weight:800;color:#10294A">${title}</div>
+        <div style="font-size:15px;font-weight:800;color:var(--tb-p,#1F2A37)">${title}</div>
         <div style="margin-top:8px"><b>البائع:</b> ${_xe(seller)} · الرقم الضريبي: ${_xe(svat || '—')}${scr ? ' · س.ت ' + _xe(scr) : ''}</div>
         ${sAddr ? '<div>العنوان: ' + _xe(sAddr) + '</div>' : ''}
         <div style="margin-top:6px">الرقم: <b>${_xe(x.no)}</b> · التاريخ: <span class="n">${x.date}${x.time ? ' ' + x.time : ''}</span>${x.terms === 'credit' && !cr && x.dueDate ? ' · الاستحقاق: <span class="n">' + (x.dueDate || '') + '</span>' : ''}</div>
@@ -9603,7 +9696,7 @@ function AuditView({ pulse, onSeen }) {
 function buildClosingA4(c, org) {
   const co = org.company || {};
   const branch = (org.branches || []).find(b => b.id === c.branchId);
-  const headLogo = (branch && branch.logoUrl) || co.logoUrl || '';
+  const headLogo = tbLogo(org, c.branchId);   // v56.0: هوية المنشأة المعقّمة (الفرع ← المنشأة)
   const money2 = (n) => (Math.round((n || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const dels = (c.deliverySales || []);
   const delComm = (d) => (d.commissionAmount != null ? d.commissionAmount : (d.amount * (d.commissionPercentage || 0) / 100));
@@ -9631,7 +9724,7 @@ function buildClosingA4(c, org) {
   const supPaySum = supPaysArr.reduce((s, pm) => s + payTotal(pm), 0);
   const supPayCash = supPaysArr.reduce((s, pm) => s + payCashPart(pm), 0);
   const expRows = (c.expenses || []).length ? (c.expenses || []).map(e => `<tr>
-    <td>${e.categoryName || '—'}${e.isTaxable ? '<br><span style="font-size:8px;color:#10294A">خاضع للضريبة' + (e.taxInvoice ? ' · فاتورة ضريبية' : '') + '</span>' : '<br><span style="font-size:8px;color:#999">غير خاضع</span>'}</td>
+    <td>${e.categoryName || '—'}${e.isTaxable ? '<br><span style="font-size:8px;color:var(--tb-p,#1F2A37)">خاضع للضريبة' + (e.taxInvoice ? ' · فاتورة ضريبية' : '') + '</span>' : '<br><span style="font-size:8px;color:#999">غير خاضع</span>'}</td>
     <td class="dim">${e.beneficiaryName || '—'}</td>
     <td>${payLbl(e.paymentMethod)}${e.receiptNumber ? '<br><span style="font-size:8px;color:#999">' + e.receiptNumber + '</span>' : ''}</td>
     <td class="ce">${e.receiptImage ? '<span class="chip">مرفق ✓</span>' : '—'}</td>
@@ -9878,12 +9971,12 @@ const A4_CSS = `
   * { box-sizing: border-box }
   body { font-family: 'MizanNum','IBM Plex Sans Arabic','Noto Sans Arabic','Readex Pro',Tahoma,sans-serif; font-variant-numeric: tabular-nums; color: #1a1a1a; margin: 0; font-size: 11px; background: #fff }
   .page { max-width: 186mm; margin: 0 auto }
-  .head { border-bottom: 2.5px solid #10294A; padding-bottom: 10px; margin-bottom: 12px }
+  .head { border-bottom: 2.5px solid var(--tb-p,#1F2A37); padding-bottom: 10px; margin-bottom: 12px }
   .co { display: flex; align-items: center; gap: 10px; margin-bottom: 8px }
   .logo { height: 44px; width: 44px; object-fit: contain; border-radius: 8px }
-  .co-n { font-size: 16px; font-weight: 700; color: #10294A }
+  .co-n { font-size: 16px; font-weight: 700; color: var(--tb-p,#1F2A37) }
   .co-m { font-size: 9.5px; color: #666; margin-top: 2px }
-  .doc-title { font-size: 15px; font-weight: 700; color: #10294A; margin-top: 6px }
+  .doc-title { font-size: 15px; font-weight: 700; color: var(--tb-p,#1F2A37); margin-top: 6px }
   .doc-sub { font-size: 11px; margin-top: 2px }
   .dim { color: #888 }
   .kpis { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-bottom: 12px }
@@ -9893,16 +9986,16 @@ const A4_CSS = `
   .kpi.ok { background: #eef8f2; border-color: #b6e2cd } .kpi.ok b { color: #2E8B62 }
   .kpi.bad { background: #fdeeed; border-color: #f2c3bf } .kpi.bad b { color: #C0392B }
   .kpi.warn { background: #fdf6e9; border-color: #f2ddb0 } .kpi.warn b { color: #B7791F }
-  .brass { color: #10294A } .rose { color: #C0392B } .mint { color: #2E8B62 }
+  .brass { color: var(--tb-p,#1F2A37) } .rose { color: #C0392B } .mint { color: #2E8B62 }
   .meta-row { display: flex; gap: 14px; align-items: center; font-size: 10.5px; color: #555; margin-bottom: 12px; flex-wrap: wrap }
-  .badge { background: #10294A; color: #fff; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: 600 }
-  .sec-h { background: #EEF1F5; color: #10294A; font-weight: 700; font-size: 11.5px; padding: 5px 9px; border-radius: 5px; margin: 12px 0 7px }
+  .badge { background: var(--tb-p,#1F2A37); color: #fff; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: 600 }
+  .sec-h { background: #EEF1F5; color: var(--tb-p,#1F2A37); font-weight: 700; font-size: 11.5px; padding: 5px 9px; border-radius: 5px; margin: 12px 0 7px }
   table.t { width: 100%; border-collapse: collapse; font-size: 10.5px }
-  table.t th { background: #10294A; color: #fff; padding: 6px 8px; text-align: right; font-weight: 600; font-size: 10px }
+  table.t th { background: var(--tb-p,#1F2A37); color: #fff; padding: 6px 8px; text-align: right; font-weight: 600; font-size: 10px }
   table.t th.num, table.t td.num { text-align: left; font-variant-numeric: tabular-nums; white-space: nowrap }
   table.t th.ce, table.t td.ce { text-align: center }
   table.t td { padding: 6px 8px; border-bottom: 1px solid #eee }
-  table.t tfoot .tot td { font-weight: 700; font-size: 11.5px; border-top: 2px solid #10294A; background: #F7F8FA }
+  table.t tfoot .tot td { font-weight: 700; font-size: 11.5px; border-top: 2px solid var(--tb-p,#1F2A37); background: #F7F8FA }
   table.t.compact td { padding: 6px 9px }
   table.t .tot.ok { background: #eef8f2 } table.t .tot.bad { background: #fdeeed } table.t .tot.warn { background: #fdf6e9 }
   .chip { background: #eef8f2; color: #2E8B62; padding: 1px 7px; border-radius: 10px; font-size: 9px; font-weight: 600 }
@@ -9920,11 +10013,11 @@ const A4_CSS = `
   .sig-ok { font-size: 9.5px; color: #2E8B62; font-weight: 600; margin-top: 4px }
   .foot { text-align: center; font-size: 9px; margin-top: 16px; border-top: 1px dashed #ccc; padding-top: 8px }
   .summary-card { border: 1px solid #e5e0d5; border-radius: 10px; padding: 11px 14px; margin-bottom: 12px; background: #F7F8FA }
-  .summary-h { font-size: 11.5px; font-weight: 700; color: #10294A; margin-bottom: 9px }
+  .summary-h { font-size: 11.5px; font-weight: 700; color: var(--tb-p,#1F2A37); margin-bottom: 9px }
   .summary-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px }
   .sc { text-align: center } .sc span { font-size: 8.5px; color: #777; display: block } .sc b { font-size: 12.5px; display: block; margin-top: 3px }
   .warn2 { color: #B7791F }
-  .banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #10294A; color: #EFE7DB; border-radius: 10px; padding: 11px 15px; margin-bottom: 12px; flex-wrap: wrap }
+  .banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--tb-p,#1F2A37); color: #EFE7DB; border-radius: 10px; padding: 11px 15px; margin-bottom: 12px; flex-wrap: wrap }
   .banner-id { font-family: 'MizanNum','IBM Plex Mono',ui-monospace,monospace; color: #E0C074; font-size: 12px; font-weight: 700; direction: ltr; text-align: left }
   .banner-sub { font-size: 9px; color: #A2968A; margin-top: 3px }
   .banner-l { text-align: end; font-size: 10px; color: #D9CFC0; display: flex; flex-direction: column; gap: 3px; align-items: flex-end }
@@ -9937,7 +10030,7 @@ function printClosingA4(c, org) {
   const w = openDocWin('width=880,height=1000');
   if (!w) return false;
   w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">
-    <title>تقرير الإغلاق - ${c.branchName} - ${c.date}</title><style>${A4_CSS}</style></head>
+    <title>تقرير الإغلاق - ${c.branchName} - ${c.date}</title><style>${tbCss(tenantBrand(org))}${A4_CSS}</style></head>
     <body>${buildClosingA4(c, org)}</body></html>`);
   w.document.close();
   setTimeout(() => { w.focus(); w.print(); }, 500);
@@ -9949,7 +10042,7 @@ function printReceipt(c, org, size) {
   const PG = size === '58' ? 58 : 80, W = size === '58' ? 48 : 74;
   const co = (org && org.company) || {};
   const branch = ((org && org.branches) || []).find(b => b.id === c.branchId);
-  const thLogo = (branch && branch.logoUrl) || co.logoUrl || '';
+  const thLogo = tbLogo(org, c.branchId);   // v56.0
   const m = (n) => (Math.round((n || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
   const line = (k, v) => `<tr><td>${k}</td><td class="v">${v}</td></tr>`;
   const dels = (c.deliverySales || []).filter(d => d.amount > 0)
@@ -10030,15 +10123,15 @@ function printPartnerStatement(p, org) {
   const bal = scr - sdr;
   const balT = Math.abs(bal) < 0.005 ? 'مسدّد' : (bal > 0 ? money(bal) + ' دائن (مستحق للطرف علينا)' : money(-bal) + ' مدين (مستحق لنا على الطرف)');
   w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>كشف حساب ${p.name}</title>
-  <style>${NUM_FACE}*{font-family:'MizanNum','IBM Plex Sans Arabic','Noto Sans Arabic','Segoe UI',Tahoma,sans-serif;box-sizing:border-box}body{margin:0;padding:28px;color:#1a1a1a}
-  .h{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #10294A;padding-bottom:12px;margin-bottom:16px}
-  .co{font-size:20px;font-weight:800;color:#10294A}.sub{font-size:12px;color:#666;margin-top:3px}
+  <style>${tbCss(tenantBrand(org))}${NUM_FACE}*{font-family:'MizanNum','IBM Plex Sans Arabic','Noto Sans Arabic','Segoe UI',Tahoma,sans-serif;box-sizing:border-box}body{margin:0;padding:28px;color:#1a1a1a}
+  .h{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--tb-p,#1F2A37);padding-bottom:12px;margin-bottom:16px}
+  .co{font-size:20px;font-weight:800;color:var(--tb-p,#1F2A37)}.sub{font-size:12px;color:#666;margin-top:3px}
   .t{font-size:22px;font-weight:800}.who{background:#F3F5F8;border:1px solid #DDE2EA;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.9}
-  .who b{color:#10294A}.bal{text-align:center;background:#FBF4E4;border:1px solid #CBD3DF;border-radius:10px;padding:12px;margin-bottom:14px}
+  .who b{color:var(--tb-p,#1F2A37)}.bal{text-align:center;background:#FBF4E4;border:1px solid #CBD3DF;border-radius:10px;padding:12px;margin-bottom:14px}
   .bal .v{font-size:26px;font-weight:800}table{width:100%;border-collapse:collapse;font-size:12px}
-  th{background:#E9EDF3;color:#10294A;padding:8px;text-align:right;border:1px solid #CBD3DF}
+  th{background:#E9EDF3;color:var(--tb-p,#1F2A37);padding:8px;text-align:right;border:1px solid #CBD3DF}
   td{padding:7px 8px;border:1px solid #DDE2EA}.n{text-align:left;font-variant-numeric:tabular-nums;direction:ltr}
-  tfoot td{background:#FBF4E4;font-weight:800;border-top:2px solid #10294A}
+  tfoot td{background:#FBF4E4;font-weight:800;border-top:2px solid var(--tb-p,#1F2A37)}
   .ft{margin-top:16px;font-size:10.5px;color:#888;text-align:center}</style></head><body>
   <div class="h"><div><div class="co">${co.name || 'الشركة'}</div><div class="sub">${co.activity || ''} ${co.taxNumber ? '· رقم ضريبي ' + co.taxNumber : ''}</div></div>
   <div style="text-align:left"><div class="t">كشف حساب</div><div class="sub">${arDate(today())}</div></div></div>
@@ -10059,24 +10152,23 @@ function printPartnerStatement(p, org) {
 //   نفس التوقيع القديم (المحتوى HTML جاهز) + خيارات اختيارية: { orientation, paper, lang }
 const _rptCtx = { user: '' };
 function rptShell(org, title, sub, bodyHtml, opt = {}) {
-  const co = (org && org.company) || {}, en = opt.lang === 'en', paper = ['A4', 'A3', 'Letter'].includes(opt.paper) ? opt.paper : 'A4', orient = opt.orientation === 'landscape' ? 'landscape' : 'portrait';
+  const co = (org && org.company) || {}, en = opt.lang === 'en', B = tenantBrand(org, { lang: opt.lang, branchId: opt.branchId }), paper = ['A4', 'A3', 'Letter'].includes(opt.paper) ? opt.paper : B.print.paper, orient = opt.orientation === 'landscape' ? 'landscape' : 'portrait';
   const foot = (en ? 'Issued from Mithqal ' : 'صادر من مِثقال ') + APP_VER + ' · ' + (en ? 'Printed by ' : 'طبعه: ') + (_rptCtx.user || '—') + ' · ' + dtLocal(new Date());
-  const logo = co.logoUrl && /^(https:|data:image\/)/.test(co.logoUrl) ? `<img class="lg" src="${_xe(co.logoUrl)}" alt="">` : '';
   return `<!doctype html><html dir="${en ? 'ltr' : 'rtl'}" lang="${en ? 'en' : 'ar'}"><head><meta charset="utf-8"><title>${_xe(title)}</title>
-  <style>@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap');${NUM_FACE}@page{size:${paper} ${orient};margin:14mm 10mm 16mm;@bottom-center{content:"${en ? 'Page ' : 'صفحة '}" counter(page) "${en ? ' of ' : ' من '}" counter(pages);font-size:9px;color:#777}@bottom-${en ? 'left' : 'right'}{content:"${foot.replace(/"/g, "'")}";font-size:8px;color:#888}}
-  *{font-family:'MizanNum','IBM Plex Sans Arabic','Noto Sans Arabic','Segoe UI',Tahoma,sans-serif;box-sizing:border-box}body{margin:0;color:#1a1a1a;font-size:12px}
-  .h{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:2px solid #10294A;padding-bottom:10px;margin-bottom:14px}.h .l{display:flex;gap:10px;align-items:center}.lg{height:46px;max-width:120px;object-fit:contain}
-  .co{font-size:18px;font-weight:800;color:#10294A}.sub{font-size:11px;color:#666;margin-top:2px}
+  <style>@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap');${NUM_FACE}${tbCss(B, { mono: opt.mono })}@page{size:${paper} ${orient};margin:14mm 10mm 16mm;@bottom-center{content:"${en ? 'Page ' : 'صفحة '}" counter(page) "${en ? ' of ' : ' من '}" counter(pages);font-size:9px;color:#777}@bottom-${en ? 'left' : 'right'}{content:"${foot.replace(/"/g, "'")}";font-size:8px;color:#888}}
+  *{font-family:'MizanNum','IBM Plex Sans Arabic','Noto Sans Arabic','Segoe UI',Tahoma,sans-serif;box-sizing:border-box}body{margin:0;color:var(--tb-t);font-size:12px}
+  .h{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:2px solid var(--tb-p);padding-bottom:10px;margin-bottom:14px}.h .l{display:flex;gap:10px;align-items:center}.lg{height:46px;max-width:120px;object-fit:contain}
+  .co{font-size:18px;font-weight:800;color:var(--tb-h)}.co2{font-size:12px;font-weight:700;color:var(--tb-a)}.s{font-size:11px;color:#666;margin-top:2px}.tf{margin-top:12px;padding-top:6px;border-top:1px solid var(--tb-line);font-size:10px;color:#666;text-align:center}.sub{font-size:11px;color:#666;margin-top:2px}
   h1{font-size:16px;margin:0}table{width:100%;border-collapse:collapse;margin:8px 0}thead{display:table-header-group}tr{page-break-inside:avoid}
-  th{background:#E9EDF3;color:#10294A;padding:7px;border:1px solid #CBD3DF;text-align:start;font-size:11px}
+  th{background:var(--tb-soft);color:var(--tb-h);padding:7px;border:1px solid var(--tb-line);text-align:start;font-size:11px}
   td{padding:6px 8px;border:1px solid #DDE2EA}.n{text-align:${en ? 'right' : 'left'};direction:ltr;font-variant-numeric:tabular-nums;white-space:nowrap}
-  .tot td{background:#FBF4E4;font-weight:800;border-top:2px solid #10294A}.neg{color:#C0392B}
-  .box{background:#F3F5F8;border:1px solid #DDE2EA;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11.5px}
+  .tot td{background:color-mix(in srgb,var(--tb-a) 14%,#fff);font-weight:800;border-top:2px solid var(--tb-p)}.neg{color:#C0392B}
+  .box{background:var(--tb-soft);border:1px solid var(--tb-line);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11.5px}
   .sign{display:flex;justify-content:space-around;margin-top:34px;text-align:center;font-size:11px}.sign div{border-top:1px solid #999;padding-top:6px;min-width:140px}
   .ft{display:none}@media screen{body{padding:26px}.ft{display:block;margin-top:14px;font-size:10px;color:#888;text-align:center}}</style></head><body>
-  <div class="h"><div class="l">${logo}<div><div class="co">${_xe(co.name || 'الشركة')}</div><div class="sub">${co.taxNumber ? (en ? 'VAT No.: ' : 'الرقم الضريبي: ') + _xe(co.taxNumber) : ''}${co.address ? ' · ' + _xe(co.address) : ''}</div></div></div>
+  <div class="h">${tbHeadHtml(B, en ? { vat: 'VAT No.', cr: 'CR' } : { vat: 'الرقم الضريبي', cr: 'السجل التجاري' })}
   <div style="text-align:${en ? 'right' : 'left'}"><h1>${title}</h1><div class="sub">${sub || ''}</div><div class="sub" data-issued>${en ? 'Issued: ' : 'تاريخ ووقت الإصدار: '}${dtLocal(new Date())}</div></div></div>
-  ${bodyHtml}
+  ${bodyHtml}${B.footer ? `<div class="tf">${_xe(B.footer)}</div>` : ''}
   <div class="ft">${foot}</div></body></html>`;
 }
 function printA4(org, title, sub, bodyHtml, opt) {
@@ -12191,8 +12283,8 @@ function morningHtml(org, D) {
     </tbody></table>` : '';
   const foodT = D.food && D.food.all.pct != null ? `<div class="sec-h">تكلفة الطعام — من ${arDate(D.food.from)} حتى ${arDate(D.day)}</div>
     <div class="note" style="background:${D.food.all.pct > D.food.tgt ? '#fdeeed' : '#eef8f2'};color:${D.food.all.pct > D.food.tgt ? '#C0392B' : '#2E8B62'}">الشركة ${D.food.all.pct}% مقابل هدف ${D.food.tgt}%${D.food.over.length ? ' — فوق الهدف: ' + D.food.over.map(x => x.b.name + ' ' + x.pct + '%').join('، ') : ' — كل الفروع ضمن الهدف'}</div>` : '';
-  return `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>التقرير الصباحي — ${D.day}</title><style>${A4_CSS}</style></head><body><div class="page">
-    <div class="head"><div class="co">${co.logoUrl ? `<img class="logo" src="${co.logoUrl}">` : MZ_LOGO_HTML}<div><div class="co-n">${co.name || ''}</div><div class="co-m">${D.brs.length} فرع</div></div></div>
+  return `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>التقرير الصباحي — ${D.day}</title><style>${tbCss(tenantBrand(org))}${A4_CSS}</style></head><body><div class="page">
+    <div class="head"><div class="co">${tbLogo(org) ? `<img class="logo" src="${tbLogo(org)}">` : MZ_LOGO_HTML}<div><div class="co-n">${co.name || ''}</div><div class="co-m">${D.brs.length} فرع</div></div></div>
     <div class="doc-title">التقرير الصباحي</div><div class="doc-sub">ليوم ${arDate(D.day)} · مقارنة بـ ${arDate(D.wk)}</div></div>
     <div class="kpis">${k('مبيعات اليوم', money(D.revT), '', D.chg != null ? (D.chg >= 0 ? '▲ ' : '▼ ') + Math.abs(D.chg) + '% عن الأسبوع السابق' : '')}
       ${k('فروع لم تُغلق', D.notClosed.length + ' / ' + D.rows.length, D.notClosed.length ? 'warn' : 'ok', D.notClosed.map(r => r.b.name).join('، '))}
@@ -13470,7 +13562,7 @@ function computeIncome(org, ops, closings, ids, from, to) {
 // طباعة قائمة الدخل كتقرير A4 رسمي
 function printIncomeA4(org, data, meta) {
   const co = org.company || {};
-  const logo = meta.branchLogo || co.logoUrl || '';
+  const logo = tbImg(meta.branchLogo) || tbLogo(org);   // v56.0
   const m = (n) => (Math.round((n || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const d = data;
   const row = (k, v, cls, ind) => `<tr class="${cls || ''}"><td style="${ind ? 'padding-inline-start:22px;color:#777' : ''}">${k}</td><td class="num">${m(v)}</td></tr>`;
@@ -13479,14 +13571,14 @@ function printIncomeA4(org, data, meta) {
   const w = openDocWin('width=880,height=1000');
   if (!w) return;
   w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">
-  <title>قائمة الدخل - ${meta.periodLabel}</title><style>${A4_CSS}
+  <title>قائمة الدخل - ${meta.periodLabel}</title><style>${tbCss(tenantBrand(org))}${A4_CSS}
     .is-t { width:100%; border-collapse:collapse; font-size:11.5px; margin-top:8px }
     .is-t td { padding:8px 10px; border-bottom:1px solid #eee }
     .is-t td.num { text-align:left; font-variant-numeric:tabular-nums; font-weight:500 }
     .is-t tr.sub td { background:#F7F8FA; font-weight:700; border-top:1.5px solid #ddd }
     .is-t tr.pos td { background:#eef8f2; font-weight:700; color:#2E8B62; font-size:13px; border-top:2px solid #2E8B62 }
     .is-t tr.neg td { background:#fdeeed; font-weight:700; color:#C0392B; font-size:13px; border-top:2px solid #C0392B }
-    .is-t tr.rev td { color:#10294A }
+    .is-t tr.rev td { color:var(--tb-p,#1F2A37) }
   </style></head><body><div class="page">
     <div class="head">
       <div class="co">${logo ? `<img class="logo" src="${logo}">` :MZ_LOGO_HTML}
@@ -13510,7 +13602,7 @@ function printIncomeA4(org, data, meta) {
       <tr class="sub"><td>إجمالي الإيرادات</td><td class="num">${m(d.grossRevenue)}</td></tr>
       ${row('عمولات منصات التوصيل', -d.commissions, '', true)}
       <tr class="sub"><td>صافي الإيرادات</td><td class="num">${m(d.netRevenue)}</td></tr>
-      <tr><td colspan="2" style="background:#10294A;color:#fff;font-weight:700;font-size:11px">التكاليف والمصروفات</td></tr>
+      <tr><td colspan="2" style="background:var(--tb-p,#1F2A37);color:#fff;font-weight:700;font-size:11px">التكاليف والمصروفات</td></tr>
       ${expRows}
       ${row('الالتزامات الثابتة (إيجار/كهرباء/مياه)', -d.fixedTotal, '', true)}
       ${row('الرواتب غير المصروفة بالفروع', -d.payrollRemaining, '', true)}
@@ -14268,9 +14360,9 @@ function qrPrintReport({ org, fb, brs, days, sel, nb, say }) {
   const scope = sel === 'all' ? 'كل الفروع' : e((brs[0] || {}).name || nb(sel));
 
   w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">
-    <title>تقرير تقييم العملاء</title><style>${A4_CSS}</style></head><body><div class="page">
+    <title>تقرير تقييم العملاء</title><style>${tbCss(tenantBrand(org))}${A4_CSS}</style></head><body><div class="page">
     <div class="head">
-      <div class="co">${co.logoUrl ? `<img class="logo" src="${e(co.logoUrl)}">` :MZ_LOGO_HTML}
+      <div class="co">${tbLogo(org) ? `<img class="logo" src="${e(tbLogo(org))}">` :MZ_LOGO_HTML}
         <div><div class="co-n">${e(co.name || 'المنشأة')}</div><div class="co-m">الرقم الضريبي: ${e(co.taxNumber || '—')}</div></div></div>
       <div class="doc-title">تقرير تقييم العملاء (QR)</div>
       <div class="doc-sub">${scope} · من ${arDate(iso(from))} إلى ${arDate(iso(to))} (آخر ${days} يومًا)</div>

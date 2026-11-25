@@ -5,7 +5,8 @@ import { EInvoiceOnboard } from './EInvoiceOnboard.jsx';
 import { RotateCcw, Scale, FileBarChart, ChevronDown, Printer, Settings, Receipt, BarChart3, Lock, Landmark, FileText, TrendingUp, ArrowLeftRight, Store, Users, QrCode, Building2, Truck, ClipboardCheck, ShieldCheck, CalendarDays, Download, Upload, Plus, Grid3x3, Check, Trash2, RefreshCw, Wallet, TrendingDown, AlertTriangle, ChevronRight, ShieldAlert, Eye, ChevronLeft, CircleDollarSign, X } from 'lucide-react';
 import { VatRegisters, SupplierPurchReport } from './TaxPurchReports.jsx';   // v39.1
 import { Suppliers } from '../inv/Suppliers.jsx';   // v44.0 «مستلم لم يُفوتر»
-import { OdooBar , SecPager, recurApply, canEditRec, dtLocal, yearEndNext } from '../../App.jsx';   // v41.0
+import { OdooBar , SecPager, recurApply, canEditRec, dtLocal, yearEndNext } from '../../App.jsx';
+import { tbCss, tenantBrand } from '../../App.jsx';   // v56.0 ألوان مستندات المنشأة   // v41.0
 import { GeneralLedger } from './GeneralLedger.jsx';   // v49.4 المرحلة 03
 import { makeRptXlsx } from '../../App.jsx';   // v50.0 منظومة التقارير
 import { DEP_METHODS, depMethod, deprSchedule, wfOn, wfRequired, wfState, wfCanAct, wfApprove } from '../../App.jsx';   // v49.4 طرق الإهلاك
@@ -520,7 +521,7 @@ export function Accounting({ org, ops, me, commit, commitOrg, say, setTab, acctI
     const body = `
     <div class="box" style="display:flex;justify-content:space-between;align-items:flex-start;gap:18px">
       <div style="line-height:1.9">
-        <div style="font-size:15px;font-weight:800;color:#10294A">${einvIsStd ? 'فاتورة ضريبية' : 'فاتورة ضريبية مبسّطة'}</div>
+        <div style="font-size:15px;font-weight:800;color:var(--tb-p,#1F2A37)">${einvIsStd ? 'فاتورة ضريبية' : 'فاتورة ضريبية مبسّطة'}</div>
         <div class="sub">${einvIsStd ? 'Tax Invoice' : 'Simplified Tax Invoice'}</div>
         <div style="margin-top:8px"><b>البائع:</b> ${_xe(einvSeller)} · الرقم الضريبي: ${_xe(einvSellerVat)}${einvSellerCR ? ' · س.ت ' + _xe(einvSellerCR) : ''}</div>
         ${einvSellerAddr ? '<div>العنوان: ' + _xe(einvSellerAddr) + '</div>' : ''}
@@ -1038,7 +1039,7 @@ export function Accounting({ org, ops, me, commit, commitOrg, say, setTab, acctI
           ${rr('الدين إلى حقوق الملكية', xTxt(ratios.de))}${rr('الخصوم إلى الأصول', pctTxt(ratios.da))}${rr('معدل دوران الأصول', xTxt(ratios.turnover))}
         </tbody></table>
       </div>
-      <h3 style="margin:14px 0 6px;color:#10294A">الاتجاه الشهري (آخر 6 أشهر)</h3>
+      <h3 style="margin:14px 0 6px;color:var(--tb-p,#1F2A37)">الاتجاه الشهري (آخر 6 أشهر)</h3>
       <table><thead><tr><th>الشهر</th><th>الإيرادات</th><th>المصروفات</th><th>صافي الربح</th></tr></thead><tbody>${trend}</tbody></table>`) || say('اسمح بالنوافذ المنبثقة للطباعة', 'no');
   };
 
@@ -1078,13 +1079,13 @@ export function Accounting({ org, ops, me, commit, commitOrg, say, setTab, acctI
     const period = (from || to) ? ('الفترة: ' + (from || 'البداية') + ' ← ' + (to || today())) : 'كامل المدة حتى ' + arDate(today());
     const isTitle = bfLabel ? ' — ' + bfLabel : ' (موحدة)';
     w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>القوائم المالية — ${co.name || ''}</title>
-    <style>${NUM_FACE}*{font-family:'MizanNum','IBM Plex Sans Arabic','Noto Sans Arabic','Segoe UI',Tahoma,sans-serif;box-sizing:border-box}body{margin:0;padding:26px;color:#1a1a1a;font-size:12.5px}
-    .h{display:flex;justify-content:space-between;border-bottom:2px solid #10294A;padding-bottom:10px;margin-bottom:14px}
-    .co{font-size:19px;font-weight:800;color:#10294A}.sub{font-size:11px;color:#666;margin-top:2px}
-    h2{font-size:15px;margin:14px 0 8px;color:#10294A}table{width:100%;border-collapse:collapse;margin-bottom:8px}
+    <style>${tbCss(tenantBrand(org))}${NUM_FACE}*{font-family:'MizanNum','IBM Plex Sans Arabic','Noto Sans Arabic','Segoe UI',Tahoma,sans-serif;box-sizing:border-box}body{margin:0;padding:26px;color:#1a1a1a;font-size:12.5px}
+    .h{display:flex;justify-content:space-between;border-bottom:2px solid var(--tb-p,#1F2A37);padding-bottom:10px;margin-bottom:14px}
+    .co{font-size:19px;font-weight:800;color:var(--tb-p,#1F2A37)}.sub{font-size:11px;color:#666;margin-top:2px}
+    h2{font-size:15px;margin:14px 0 8px;color:var(--tb-p,#1F2A37)}table{width:100%;border-collapse:collapse;margin-bottom:8px}
     td{padding:6px 8px;border:1px solid #DDE2EA}.n{text-align:left;direction:ltr;font-variant-numeric:tabular-nums;white-space:nowrap}
-    .tot td{background:#FBF4E4;font-weight:800;border-top:2px solid #10294A}
-    .hd td{font-weight:800;color:#10294A;border:0;padding-top:10px}.grp td{font-weight:700;background:#F7F8FA}.net td{border-top:3px double #1a1a1a;font-size:13.5px}
+    .tot td{background:#FBF4E4;font-weight:800;border-top:2px solid var(--tb-p,#1F2A37)}
+    .hd td{font-weight:800;color:var(--tb-p,#1F2A37);border:0;padding-top:10px}.grp td{font-weight:700;background:#F7F8FA}.net td{border-top:3px double #1a1a1a;font-size:13.5px}
     .ft{margin-top:14px;font-size:10px;color:#888;text-align:center}.grid2{display:flex;gap:16px}.grid2>div{flex:1}</style></head><body>
     <div class="h"><div><div class="co">${co.name || 'الشركة'}</div><div class="sub">${co.taxNumber ? 'الرقم الضريبي: ' + co.taxNumber : ''}</div></div>
     <div style="text-align:left"><div style="font-size:17px;font-weight:800">القوائم المالية</div><div class="sub">${period}</div></div></div>

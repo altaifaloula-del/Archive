@@ -1978,4 +1978,13 @@ table.tb.tb-fp{min-width:520px}
 [data-rowi].row-drag{opacity:.55;outline:2px dashed var(--gold,#C8A24A);outline-offset:2px;border-radius:8px}
 [data-rowi].row-over{box-shadow:0 -3px 0 0 var(--gold,#C8A24A);border-radius:2px}
 @media(pointer:coarse){.rowgrip .rg-h{font-size:20px;padding:8px 6px}.rowgrip .rg-ab{display:none}}
+
+/* v56.0 — الهوية التجارية للمنشأة (إعدادات) */
+.tb-logo-box{width:88px;height:56px;border:1px dashed var(--line);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;background:repeating-conic-gradient(var(--ink3) 0 25%,var(--ink2) 0 50%) 50%/12px 12px;overflow:hidden;color:var(--faint)}
+.tb-logo-box img{max-width:100%;max-height:100%;object-fit:contain}
+.tb-platform{display:inline-flex;align-items:center;gap:6px;margin-inline-start:8px;padding:2px 8px;border:1px solid var(--line);border-radius:var(--r-full);font:700 11px/1.6 Manrope,var(--font-ui);letter-spacing:.06em;vertical-align:middle}
+.tb-preview{display:grid;gap:10px}
+.tb-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:var(--r-full);border:1px solid color-mix(in srgb,var(--tbp) 35%,var(--line));background:color-mix(in srgb,var(--tbp) 8%,var(--ink2));width:max-content;max-width:100%}
+.tb-chip img{height:28px;max-width:72px;object-fit:contain}.tb-chip b{color:var(--txt)}
+.tb-ini{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--tbp);color:#fff;font-weight:800}
 `;
