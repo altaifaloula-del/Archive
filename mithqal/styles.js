@@ -1685,7 +1685,7 @@ table.tb.rc-tb{min-width:0}
 .ob-sp{flex:1 1 auto}.ob .acct-mode{margin-inline-start:4px}
 @media (max-width:640px){.ob-it{padding:8px 9px;font-size:13px}}
 /* v56.0 (DESIGN-V56-008): على الجوال كان شريط أقسام المركز يلتف إلى نحو 5 أسطر فيدفع المحتوى تحت الشاشة الأولى — صار سطرًا واحدًا قابلًا للتمرير أفقيًا */
-@media (max-width:640px){.ob{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}.ob::-webkit-scrollbar{display:none}.ob-it{flex-shrink:0;white-space:nowrap}}
+@media (max-width:640px){.ob{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}.ob::-webkit-scrollbar{display:none}.ob-it{flex-shrink:0;white-space:nowrap}.ob .acct-mode{flex-shrink:0}.ob .acct-mode button{white-space:nowrap}.ob .acct-mode button span{display:none}}   /* المبدّل لا ينكمش (كان يتكدّس حرفًا فوق حرف) — أيقونات فقط على الجوال */
 
 /* v41.2 — جدول حجم البيانات */
 .tbl-wrap{overflow-x:auto;max-width:100%}
@@ -2022,4 +2022,6 @@ table.tb.tb-fp{min-width:520px}
 .rd-t{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--ink2)}.rd-tl{font-size:12px;color:var(--dim);margin-bottom:6px}
 .rd-bars{display:flex;align-items:flex-end;gap:10px;height:76px}.rd-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%}
 .rd-bar i{display:block;width:100%;max-width:38px;background:var(--brass);border-radius:4px 4px 0 0;opacity:.85}.rd-bar i.neg{background:var(--rose)}.rd-bar span{font-size:10.5px;color:var(--faint)}
+/* v56.0 (DESIGN-V56-009): ملخص المحاسبة يتكرر أعلى كل أقسامها الـ31 — على الجوال صار شبكة 2×2 مضغوطة بلا أسطر فرعية فيظهر محتوى القسم مبكرًا */
+@media (max-width:640px){.rms .acct-sum{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:6px !important}.rms .acct-sum .kpi{padding:8px 10px !important;min-height:0 !important}.rms .acct-sum .kpi-s,.rms .acct-sum .kpi::before,.rms .acct-sum .kpi::after,.rms .acct-sum .kpi-l svg{display:none !important}.rms .acct-sum .kpi-l{font-size:11.5px !important;margin:0 0 2px !important}.rms .acct-sum .kpi-v{font-size:17px !important;line-height:1.3 !important}}
 `;

@@ -9,7 +9,7 @@ const server = http.createServer((q, r) => { const f = path.join(cache, decodeUR
 await new Promise(ok => server.listen(0, '127.0.0.1', ok)); const base = 'http://127.0.0.1:' + server.address().port + '/tests/ui/fixture.html#';
 const b = await chromium.launch();
 const c0 = await b.newContext(); const p0 = await c0.newPage(); await p0.goto(base + 'comp/Launcher'); await p0.waitForTimeout(800);
-const routes = await p0.evaluate(() => window.routes); await c0.close();
+const routes = (await p0.evaluate(() => window.routes)).filter(r => !process.argv[3] || r.includes(process.argv[3])); await c0.close();
 const issues = [], shots = { desk: [], mob: [], dark: [] };
 for (const [dev, opt, dark] of [['desk', { viewport: { width: 1280, height: 860 } }, false], ['mob', devices['iPhone 13'], false], ['dark', { viewport: { width: 1280, height: 860 } }, true]]) {
   const ctx = await b.newContext(opt);
@@ -19,7 +19,7 @@ for (const [dev, opt, dark] of [['desk', { viewport: { width: 1280, height: 860 
     await p.waitForFunction(() => !document.querySelector('.mod-loading'), null, { timeout: 15000 }).catch(() => {}); await p.waitForTimeout(250);
     const m = await p.evaluate(() => ({ crash: document.getElementById('crash')?.innerText || '', over: document.documentElement.scrollWidth - window.innerWidth, txt: document.body.innerText.length,
       lowContrast: [...document.querySelectorAll('h1,h2,h3,.card-t,.btn,td,th,label')].slice(0, 400).filter(el => { const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || !el.offsetWidth) return false;
-        const c = cs.color.match(/\d+/g).map(Number); let n = el, bg = null; while (n) { const x = getComputedStyle(n).backgroundColor; const v = x.match(/[\d.]+/g); if (v && (v.length < 4 || +v[3] > 0.5)) { bg = v.map(Number); break; } n = n.parentElement; }
+        let c = cs.color.match(/[\d.]+/g).map(Number); if (/^color\(srgb/.test(cs.color)) c = c.map((t, i) => i < 3 ? t * 255 : t); let n = el, bg = null; while (n) { const x = getComputedStyle(n).backgroundColor; let v = x.match(/[\d.]+/g); if (v && /^color\(srgb/.test(x)) v = v.map((t, i) => i < 3 ? String(+t * 255) : t);   /* color-mix ⇒ color(srgb 0–1) */ if (v && (v.length < 4 || +v[3] > 0.5)) { bg = v.map(Number); break; } n = n.parentElement; }
         if (!bg) bg = [255, 255, 255]; const L = (a) => { const s = a.slice(0, 3).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * s[0] + 0.7152 * s[1] + 0.0722 * s[2]; };
         const l1 = L(c), l2 = L(bg); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05) < 3; }).map(el => el.tagName + ':' + (el.innerText || '').trim().slice(0, 30)).slice(0, 5) }));
     const f = dev + '__' + r.replace(/[^a-z0-9]+/gi, '_') + '.png'; await p.screenshot({ path: path.join(out, f) }); shots[dev].push([r, f]);

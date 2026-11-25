@@ -1493,7 +1493,7 @@ export function Accounting({ org, ops, me, commit, commitOrg, say, setTab, acctI
           <div style={{ fontSize: 12.5, marginTop: 4 }}>جُمعت مبالغها في «الحساب المعلّق 9999» حتى لا يختل ميزان المراجعة. صحّحها بقيد يدوي ينقلها للحساب الصحيح، أو أعِد إنشاء الحساب بالرمز نفسه.</div>
         </div>
       )}
-      <div className="grid g4">
+      <div className="grid g4 acct-sum" data-acct-sum>   {/* v56.0 (DESIGN-V56-009): مضغوطة على الجوال */}
         <Kpi label="القيود المسجّلة" value={String(A.entries.length)} sub="تلقائية من عملياتك + يدوية المحاسب" icon={FileText} color="#4FB286" />
         <Kpi label={A.balanced ? 'كل القيود متوازنة ✓' : 'يوجد قيد غير متوازن!'} value={money(A.totalDebit)}
           sub="إجمالي المدين = إجمالي الدائن" icon={Scale} color={A.balanced ? '#D9A83E' : '#D9544D'} />
