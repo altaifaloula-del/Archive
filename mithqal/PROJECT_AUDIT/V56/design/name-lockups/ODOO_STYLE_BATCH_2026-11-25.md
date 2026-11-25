@@ -50,3 +50,7 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 - متاحة .com: **sunbulo**، yaneea، jidhro، wathqo، namaao، nakhlio، wareefo، rabwo.
 - Wareef: شركة تقنية معلومات سعودية منذ 1998 (حلول مصرفية) ⇒ مستبعد.
 - **Sunbulo — سُنبُلو** (من «سنبلة»): sunbulo.com **متاح**؛ أقرب نتيجة Sunbula استشارات صغيرة في القدس (مجال مختلف). **مرشح نظيف.**
+
+## بدون «o» في الآخر (حقل الثقة والنمو)
+- 25 اسمًا: محجوزة .com عدا zakwa وsunbelah. Zakwa: تطبيق «زكوة» لحساب الزكاة على Google Play ⇒ مستبعد.
+- Sunbula/سنبلة: sunbula.com محجوز (المالك غير معروف)، ولا منافس برمجي ظاهر (أقرب نتيجة استشارات صغيرة في القدس).
