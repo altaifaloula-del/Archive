@@ -5074,6 +5074,8 @@ function KbShortcuts({ onAction }) {
 function GlobalSearch({ open, onClose, org, ops, allowed, screens, setTab, help }) {
   const [q, setQ] = useState(''); const [i, setI] = useState(0); const inp = useRef(null);
   useEffect(() => { if (open) { setQ(''); setI(0); setTimeout(() => inp.current && inp.current.focus(), 20); } }, [open]);
+  // Esc يغلق النافذة في الوضعين (نافذة الاختصارات بلا حقل يلتقطه)
+  useEffect(() => { if (!open) return; const h = (e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [open, onClose]);
   const R = useMemo(() => open && !help ? gsearch(org, ops, allowed, screens, q) : [], [open, help, org, ops, allowed, screens, q]);
   if (!open) return null;
   const go = (r) => { if (!r) return; onClose(); if (r.go.tab) setTab(r.go.tab); if (r.go.peek) setTimeout(() => peekDoc(r.go.peek), 60); };
@@ -8422,6 +8424,9 @@ function useSecNav() {
    groups: [{ id, ar, items: [{ id, ar, icon, badge, sub }] }] — sub: عنوان فرعي داخل القائمة (اختياري) */
 function OdooBar({ groups, cur, onPick, extra, sw }) {
   const [open, setOpen] = useState(null);
+  // v56.0 (DESIGN-V56-008): على الجوال الشريط سطر قابل للتمرير — القسم الحالي يُمرَّر ليظهر
+  const obRef = useRef(null);
+  useEffect(() => { const c = obRef.current; if (!c || c.scrollWidth <= c.clientWidth + 2) return; const el = c.querySelector('.ob-it.on'); if (el && el.scrollIntoView) { try { el.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch { } } }, [cur]);
   const [vars, setVars] = useState({});
   const [pos, setPos] = useState(null);   // القائمة تُرسم في جذر الصفحة (portal) لتعلو كل البطاقات، بموضع الزر
   const place = (el) => { if (!el) return; const r = el.getBoundingClientRect(), W = window.innerWidth;
@@ -8432,7 +8437,7 @@ function OdooBar({ groups, cur, onPick, extra, sw }) {
   const gs = (groups || []).map(g => ({ ...g, items: (g.items || []).filter(Boolean) })).filter(g => g.items.length);
   const pick = (id) => { setOpen(null); onPick(id); };
   return (
-    <div className="ob" role="navigation" aria-label="أقسام التطبيق">
+    <div className="ob" role="navigation" aria-label="أقسام التطبيق" ref={obRef}>
       {gs.map(g => { const act = g.items.some(x => x.id === cur);
         if (g.items.length === 1) { const x = g.items[0]; return <button key={g.id} className={'ob-it' + (act ? ' on' : '')} onClick={() => pick(x.id)}>{TX(x.ar)}{x.badge ? <span className="ob-bd">{x.badge}</span> : null}</button>; }
         const subs = [...new Set(g.items.map(x => x.sub || ''))];

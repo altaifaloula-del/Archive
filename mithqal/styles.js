@@ -1684,6 +1684,8 @@ table.tb.rc-tb{min-width:0}
 .ob-bd{background:var(--amber,#E0A458);color:#fff;border-radius:9px;font-size:10px;padding:0 6px;font-weight:700}
 .ob-sp{flex:1 1 auto}.ob .acct-mode{margin-inline-start:4px}
 @media (max-width:640px){.ob-it{padding:8px 9px;font-size:13px}}
+/* v56.0 (DESIGN-V56-008): على الجوال كان شريط أقسام المركز يلتف إلى نحو 5 أسطر فيدفع المحتوى تحت الشاشة الأولى — صار سطرًا واحدًا قابلًا للتمرير أفقيًا */
+@media (max-width:640px){.ob{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}.ob::-webkit-scrollbar{display:none}.ob-it{flex-shrink:0;white-space:nowrap}}
 
 /* v41.2 — جدول حجم البيانات */
 .tbl-wrap{overflow-x:auto;max-width:100%}
