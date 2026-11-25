@@ -35,3 +35,8 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 | qatiba.com | **متاح** | — |
 | maknaz.com | محجوز | getmaknaz.com، maknazapp.com، maknaztech.com متاحة |
 | wasaq.com | محجوز | — |
+
+## دفعة رابعة (اسم مختلف) — .com من Verisign
+- 45 اسمًا عربيًا أو مبتكرًا من 5–6 أحرف: كلها محجوزة عدا thabra وruqmo.
+- جذر «رقم»: raqmo/rakmo/arqamo/raqmy محجوزة؛ **raqamo.com متاح**، ruqmo.com متاح.
+- تعارض Raqamo: لا شركة/تطبيق بالاسم. الأقرب RAQMO-APP (منشئ تطبيقات للمتاجر، اليابان) — مجال برمجي مختلف، خطر منخفض–متوسط.
