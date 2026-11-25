@@ -835,7 +835,7 @@ function dirOf(org) {
     products: (org.products || []).map(p => ({ id: p.id, name: p.name, sellPrice: p.sellPrice || 0, cat: p.cat || '', ...(p.posOff ? { posOff: true } : {}), ...(p.disc ? { disc: p.disc } : {}), ...(p.img ? { img: p.img } : {}) })),   // v45.4: صورة المنتج المصغّرة لنقطة البيع
     posCfg: org.posCfg || {}, posPromos: org.posPromos || [], loyaltyCfg: org.loyaltyCfg || {}, mkt: { loy: ((org.mkt || {}).loy) || {}, seg: ((org.mkt || {}).seg) || {}, approveDiscPct: (org.mkt || {}).approveDiscPct },   // v48.1 إعداد الولاء المتقدم وقواعد الشرائح (بلا أسرار)
     taxCfg: { enabled: !!(org.taxCfg || {}).enabled, rate: (org.taxCfg || {}).rate || 15 },
-    branches: (org.branches || []).map(b => ({ id: b.id, name: b.name, defaultFloat: b.defaultFloat || 0, isActive: b.isActive !== false, logoUrl: b.logoUrl || '', city: b.city || '', bankName: b.bankName || '', bankAcc: b.bankAcc || '', geofence: b.geofence || null })),   // v24.0: الجيوفنس لازم لكشك الحضور على جهاز الفرع
+    branches: (org.branches || []).map(b => ({ id: b.id, name: b.name, defaultFloat: b.defaultFloat || 0, isActive: b.isActive !== false, logoUrl: b.logoUrl || '', brandColor: tbHex(b.brandColor), city: b.city || '', bankName: b.bankName || '', bankAcc: b.bankAcc || '', geofence: b.geofence || null })),   // v24.0: الجيوفنس لازم لكشك الحضور على جهاز الفرع
     expenseCats: org.expenseCats || [],
     purchaseCfg: { inspect: !!(org.purchaseCfg || {}).inspect },   // v44.3: استلام الفرع لأوامر الشراء يتبع مسار الفحص إن فُعّل
     deliveryApps: org.deliveryApps || [],
@@ -1770,7 +1770,7 @@ function tenantBrand(org, opt = {}) {
   const nameAr = b.nameAr || tbStr(co.name, 120), nameEn = b.nameEn;
   return { nameAr, nameEn, name: en ? (nameEn || nameAr) : (nameAr || nameEn), altName: en ? (nameEn ? nameAr : '') : nameEn,
     logo: b.logo || coLogo, logoAlt: b.logoAlt || b.logo || coLogo, logoDoc: brLogo || b.logoDoc || b.logo || coLogo,
-    colors: { ...TB_NEUTRAL, ...b.colors }, vat: tbStr(co.taxNumber, 30), cr: tbStr(co.commercialReg, 30),
+    colors: { ...TB_NEUTRAL, ...b.colors, ...(br && tbHex(br.brandColor) ? { primary: tbHex(br.brandColor) } : {}) }, vat: tbStr(co.taxNumber, 30),   // v56.0: لون الفرع يغلب في مستنداته cr: tbStr(co.commercialReg, 30),
     address: en ? (b.addressEn || b.address || tbStr(co.address, 300)) : (b.address || tbStr(co.address, 300)),
     phone: b.phone || tbStr(co.phone, 40), email: b.email || tbStr(co.email, 120), website: b.website,
     header: b.header, footer: en ? (b.footerEn || b.footer) : (b.footer || b.footerEn),
@@ -3530,6 +3530,7 @@ export { jeLive, jeOwner, canApproveJe, jeAutoSt, vatCloseLive, WF_DOCS, wfTiers
 export { gosiNewSched, gosiNewAuto };   // v47.2 الرواتب   // v46.8 مرتجع نقطة البيع   // v46.8: للاختبارات الوظيفية (حارس الإقفال)
 export { findDupClosings, clDayKey, clrKeyId, yearEndDates, yearEndNext, payFactor, POS_HOLD_MAX, posHolds, posHoldsSet, posHoldPut, posHoldRecall };
 export { rptPivot, rptTpl, RPT_TPL_ALIAS };
+export { salesInvoiceHtml };
 export { TB_NEUTRAL, TB_TPL_INV, TB_TPL_RPT, TB_PAPER, TB_IMG_MAX, tbNorm, tenantBrand, tbCss, tbHeadHtml, tbLogo, tbImg };   // v56.0 هوية المنشأة   // v56.0 (GAP-002) الحارس المركزي لتكرار الإغلاق
 if (typeof window !== 'undefined' && !window.__mizanErrHook) {
   window.__mizanErrHook = true;
@@ -7988,7 +7989,7 @@ function DocPeekHost({ org, ops }) {
     </Modal>);
 }
 
-function printSalesInvoice(org, x, orig) {
+function salesInvoiceParts(org, x, orig) {
   const ent = entityById(org, x.entityId);
   const seller = ent.name || ((org.company || {}).name) || '', svat = ent.taxNumber || '', scr = ent.commercialReg || '';
   const sAddr = ent.primary ? ((org.company || {}).address || '') : (ent.address || '');
@@ -8019,7 +8020,16 @@ function printSalesInvoice(org, x, orig) {
       </tbody>
     </table>
     <div class="box" style="font-size:9.5px;color:#888">التسلسل في السجل: ${x.icv} · البصمة الرقمية: <span style="direction:ltr;unicode-bidi:embed">${x.hash ? x.hash.slice(0, 32) + '…' : ''}</span></div>`;
-  return printA4(org, title + ' ' + x.no, 'البائع: ' + seller + (svat ? ' · الرقم الضريبي: ' + svat : ''), body);
+  return { title: title + ' ' + x.no, sub: 'البائع: ' + seller + (svat ? ' · الرقم الضريبي: ' + svat : ''), body };
+}
+/** v56.0: HTML الفاتورة كاملًا بقالب المنشأة (classic/modern/compact) ولون فرعها — دالة نقية للطباعة والاختبار */
+function salesInvoiceHtml(org, x, orig) {
+  const P = salesInvoiceParts(org, x, orig), B = tenantBrand(org, { branchId: x.branchId });
+  return rptShell(org, P.title, P.sub, P.body, { invTpl: B.invoiceTpl, branchId: x.branchId });
+}
+function printSalesInvoice(org, x, orig) {
+  const w = openDocWin('width=900,height=1000'); if (!w) return false;
+  w.document.write(salesInvoiceHtml(org, x, orig)); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400); return true;
 }
 /* SalesInvoices: نُقل إلى mods/pos/SalesInvoices.jsx (تحميل كسول) */
 
@@ -10173,7 +10183,11 @@ function rptShell(org, title, sub, bodyHtml, opt = {}) {
   .tot td{background:color-mix(in srgb,var(--tb-a) 14%,#fff);font-weight:800;border-top:2px solid var(--tb-p)}.neg{color:#C0392B}
   .box{background:var(--tb-soft);border:1px solid var(--tb-line);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11.5px}
   .sign{display:flex;justify-content:space-around;margin-top:34px;text-align:center;font-size:11px}.sign div{border-top:1px solid #999;padding-top:6px;min-width:140px}
-  .ft{display:none}@media screen{body{padding:26px}.ft{display:block;margin-top:14px;font-size:10px;color:#888;text-align:center}}</style></head><body>
+  /* v56.0 — قوالب الفاتورة الثلاثة (هوية المنشأة: invoiceTpl) */
+  .inv-modern .h{background:var(--tb-p);border:0;border-radius:10px;padding:14px 16px}.inv-modern .h .co,.inv-modern .h .co2,.inv-modern .h h1,.inv-modern .h .s,.inv-modern .h .sub{color:#fff}.inv-modern .h .lg{background:#fff;border-radius:8px;padding:3px}
+  .inv-modern th{background:var(--tb-p);color:#fff;border-color:var(--tb-p)}.inv-modern .tot td{background:var(--tb-p);color:#fff;border-top:0}.inv-modern .box{border-radius:10px;border-inline-start:4px solid var(--tb-a)}
+  .inv-compact{font-size:10.5px}.inv-compact th,.inv-compact td{padding:3px 6px}.inv-compact .h{padding-bottom:5px;margin-bottom:8px}.inv-compact .lg{height:30px}.inv-compact .co{font-size:14px}.inv-compact h1{font-size:13px}.inv-compact .box{padding:6px 8px;margin-bottom:6px}
+  .ft{display:none}@media screen{body{padding:26px}.ft{display:block;margin-top:14px;font-size:10px;color:#888;text-align:center}}</style></head><body class="inv-${_xe(opt.invTpl || 'classic')}" data-inv-tpl="${_xe(opt.invTpl || 'classic')}">
   <div class="h">${tbHeadHtml(B, en ? { vat: 'VAT No.', cr: 'CR' } : { vat: 'الرقم الضريبي', cr: 'السجل التجاري' })}
   <div style="text-align:${en ? 'right' : 'left'}"><h1>${title}</h1><div class="sub">${sub || ''}</div><div class="sub" data-issued>${en ? 'Issued: ' : 'تاريخ ووقت الإصدار: '}${dtLocal(new Date())}</div></div></div>
   ${bodyHtml}${B.footer ? `<div class="tf">${_xe(B.footer)}</div>` : ''}

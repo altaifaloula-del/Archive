@@ -110,3 +110,26 @@ test('ثبات هوية المنصة: الرمز في الواجهة من اله
   const { mqSymbolShapes } = await import('../brand-geom.js');
   assert.equal(mqSymbolShapes().outer.length, 2); assert.equal(mqSymbolShapes().inner.length, 2);
 });
+
+const INV = { id: 'si1', kind: 'invoice', type: 'simplified', no: 'INV-2026-00001', date: '2026-04-02', time: '10:30', branchId: 'b1', icv: 7, hash: 'a'.repeat(64),
+  lines: [{ desc: 'وجبة', qty: 2, price: 50, net: 100, vatRate: 15, vat: 15 }], net: 100, vat: 15, total: 115, buyer: { name: 'عميل' } };
+
+test('قوالب الفاتورة الثلاثة: classic/modern/compact حسب إعداد المنشأة — والأرقام والرمز الضريبي نفسها', () => {
+  const html = (tpl) => E.salesInvoiceHtml({ ...orgA, branding: { ...orgA.branding, invoiceTpl: tpl } }, INV);
+  for (const t of ['classic', 'modern', 'compact']) {
+    const h = html(t); assert.match(h, new RegExp('data-inv-tpl="' + t + '"')); assert.match(h, /115\.00/); assert.match(h, /INV-2026-00001/); assert.match(h, /<svg/, 'رمز QR');
+  }
+  assert.match(html('bogus'), /data-inv-tpl="classic"/, 'قيمة غير معروفة ⇒ الكلاسيكي');
+  assert.match(html('modern'), /\.inv-modern \.h\{background:var\(--tb-p\)/);
+  assert.doesNotMatch(html('modern'), /#10294A/i, 'لا ألوان المنصة في فاتورة المنشأة');
+});
+
+test('هوية الفرع: لون الفرع يغلب في مستنداته وفواتيره فقط، والقيمة غير الصالحة تُتجاهل', () => {
+  const o = { ...orgA, branches: [{ id: 'b1', name: 'العليا', brandColor: '#aa3300' }, { id: 'b2', name: 'النخيل', brandColor: 'red' }] };
+  assert.equal(E.tenantBrand(o, { branchId: 'b1' }).colors.primary, '#AA3300');
+  assert.equal(E.tenantBrand(o, { branchId: 'b2' }).colors.primary, '#0B6E4F', 'غير صالح ⇒ لون المنشأة');
+  assert.equal(E.tenantBrand(o).colors.primary, '#0B6E4F', 'بلا فرع ⇒ لون المنشأة');
+  assert.match(E.salesInvoiceHtml(o, INV), /--tb-p:#AA3300/, 'فاتورة فرع العليا بلونه');
+  assert.match(E.rptHtml(o, spec({ meta: { branchId: 'b1', user: 'م', at: '2026-04-01T09:00:00Z' } })), /--tb-p:#AA3300/);
+  assert.equal(E.dirOf(o).branches.find(b => b.id === 'b2').brandColor, '', 'الدليل يحمل اللون المعقّم');
+});

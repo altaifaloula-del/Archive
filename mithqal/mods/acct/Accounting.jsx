@@ -539,7 +539,7 @@ export function Accounting({ org, ops, me, commit, commitOrg, say, setTab, acctI
       </tbody>
     </table>
     <div class="box" style="font-size:10px;color:#777">${einvIsStd ? 'فاتورة ضريبية (B2B) تحوي بيانات البائع والمشتري كاملة' : 'فاتورة ضريبية مبسّطة (B2C)'} متوافقة مع المرحلة الأولى للفوترة الإلكترونية (رمز QR بترميز TLV: اسم البائع، الرقم الضريبي، التاريخ والوقت، الإجمالي، وقيمة الضريبة). الربط المعتمد للمرحلة الثانية يتطلب شهادة رقمية وتكامل بوابة «فاتورة» من هيئة الزكاة والضريبة والجمارك.</div>`;
-    const ok = printA4(org, einvIsStd ? 'فاتورة ضريبية' : 'فاتورة ضريبية مبسّطة', 'البائع: ' + (einvSeller || '—') + ' · الرقم الضريبي: ' + (einvSellerVat || '—'), body);
+    const ok = printA4(org, einvIsStd ? 'فاتورة ضريبية' : 'فاتورة ضريبية مبسّطة', 'البائع: ' + (einvSeller || '—') + ' · الرقم الضريبي: ' + (einvSellerVat || '—'), body, { invTpl: tenantBrand(org).invoiceTpl });   // v56.0 قالب فاتورة المنشأة
     if (!ok) return say('اسمح بالنوافذ المنبثقة للطباعة', 'no');
     if (!einvF.invNo.trim() && canPost) commitOrg(d => ({ ...d, einvSeq: (d.einvSeq || 0) + 1 }), { actionType: 'create', targetType: 'tax_settings', targetId: 'einvSeq', need: 'post', title: 'إصدار ' + (einvIsStd ? 'فاتورة ضريبية' : 'فاتورة مبسّطة'), details: einvNo }).catch(() => { });  // v15.11: لا يزيد التسلسل لدور «عرض فقط»
   };
