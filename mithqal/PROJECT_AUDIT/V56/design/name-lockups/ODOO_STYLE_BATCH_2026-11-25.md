@@ -75,3 +75,8 @@ hasboo, hisboo, zammoo, rasdoo, qaydoo, lammoo, dammoo, thamroo, hesaboo, hesboo
 - استُبعد للمعنى: kuldara (kul بالتركية «عبد»)، belkona («بلكونة»)، gorsina (gore)، haskina («حسك»).
 - نظيفة في البحث: **yeltara، tamesko، zamrina** (أقرب Zamra Tech لخدمات تقنية — منخفض/متوسط)، **soltaki/tolsaro** (أقرب Soltaro بطاريات أسترالية — منخفض).
 - سلطان: sultan.com وكل البدائل محجوزة عدا sultanhq.com؛ اسم شخصي/لقب شائع ⇒ لا يحقق الشرط.
+
+## اسم مختصر من حروف (اختصار)
+- 20 اختصارًا من 4–5 أحرف (tiba, sibra, tibra, raba, isba, sabra, ibsa…): **كلها .com محجوزة** — كل تركيبات الأحرف الأربعة في .com مسجلة.
+- SIBRA: مستعمل (Sibra أوروغواي لبرمجيات ERP/مالية، SIBRA GmbH ألمانية) ⇒ مستبعد.
+- **TIBA** (Trusted Integrated Business Accounting / «طيبة»): لا شركة برمجيات بالاسم في السعودية ومصر؛ tiba.com وgettiba.com وtibacloud.com محجوزة؛ **tibaerp.com متاح**.
