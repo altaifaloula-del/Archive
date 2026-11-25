@@ -2011,4 +2011,13 @@ table.tb.tb-fp{min-width:520px}
 .tn-cur{display:flex;justify-content:space-between;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}.tn-cur .num,.tn-it .num{font-size:11px;color:var(--faint)}
 .tn-sec{font-size:11px;color:var(--dim);margin-top:4px}.tn-it{display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:var(--r-sm);background:transparent;color:inherit;font:inherit;cursor:pointer;text-align:start}
 .tn-it:hover{background:var(--acc-soft)}.tn-note{font-size:10.5px;color:var(--faint);line-height:1.6}
+/* v56.0 — لوحات الأدوار */
+.rd-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.rd-sel{width:auto;min-width:180px;height:36px}
+.rd-k{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}
+.rd-c{display:grid;gap:4px;text-align:start;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--ink2);color:var(--txt);font:inherit;cursor:pointer;border-inline-start:3px solid var(--brass)}
+.rd-c:disabled{cursor:default}.rd-c:hover:not(:disabled){box-shadow:var(--sh-2)}.rd-l{font-size:12px;color:var(--dim)}.rd-c b{font-size:19px;font-weight:800}
+.rd-d{font-size:11.5px;color:var(--faint);min-height:16px}.rd-d.ok{color:var(--mint)}.rd-d.bad{color:var(--rose)}.rd-d small{color:var(--faint)}
+.rd-t{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--ink2)}.rd-tl{font-size:12px;color:var(--dim);margin-bottom:6px}
+.rd-bars{display:flex;align-items:flex-end;gap:10px;height:76px}.rd-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%}
+.rd-bar i{display:block;width:100%;max-width:38px;background:var(--brass);border-radius:4px 4px 0 0;opacity:.85}.rd-bar i.neg{background:var(--rose)}.rd-bar span{font-size:10.5px;color:var(--faint)}
 `;

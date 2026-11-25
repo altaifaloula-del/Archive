@@ -52,3 +52,43 @@ test('محدد المنشأة: قائمة الجهاز (الأحدث أولًا�
   assert.equal(E.tnHref({ pathname: '/mithqal/' }, 'oasis'), '/mithqal/?t=oasis');
   assert.equal(E.tnHref({ pathname: '/' }, 'https://evil.com'), '', 'لا روابط خارجية'); assert.equal(E.tnHref({ pathname: '/' }, 'a'), '', 'قصير جدًا');
 });
+
+/* ===================== لوحات الأدوار ===================== */
+const cl = (x) => ({ id: 'c', branchId: 'b1', branchName: 'العليا', status: 'approved', totalRevenue: 1150, cashSales: 690, cardSales: 460, deliverySales: [], expenses: [], totalExpenses: 0, variance: 0, actualCashCount: 690, expectedCashInSafe: 690, transferredToMainTreasury: 0, supplierPayments: [], ...x });
+const dOrg = { company: { name: 'اختبار' }, branches: [{ id: 'b1', name: 'العليا' }, { id: 'b2', name: 'النخيل' }], taxCfg: { enabled: true, rate: 15 },
+  employees: [{ id: 'e1', branchId: 'b1', baseSalary: 6000, hireDate: '2020-01-01' }, { id: 'e2', branchId: 'b2', baseSalary: 3000, hireDate: '2026-03-16' }] };
+const dOps = { closings: [cl({ id: 'm1', date: '2026-03-10' }), cl({ id: 'm2', date: '2026-03-11', totalRevenue: 2300, cashSales: 1380, cardSales: 920 }), cl({ id: 'f1', date: '2026-02-10' }), cl({ id: 'x', date: '2026-03-12', branchId: 'b2', status: 'draft' }), cl({ id: 'd', date: '2026-03-13', variance: -40 })],
+  journalManual: [{ id: 'j1', date: '2026-03-20', title: 'إيجار', lines: [{ code: '5901', debit: 300, credit: 0 }, { code: '1201', debit: 0, credit: 300 }] }, { id: 'j2', date: '2026-03-21', status: 'pending', title: 'معلق', lines: [] }],
+  invoices: [{ id: 'p1', supplierId: 's', supplierName: 'م', amount: 1150, taxable: true, date: '2026-03-05', dueDate: '2026-03-20', paidAmount: 0 }] };
+const ALLD = ['acct', 'analytics', 'reporting', 'sales', 'pos', 'purchasing', 'inv', 'people', 'hrops', 'closing', 'approve', 'treasury'];
+
+test('لوحات الأدوار: التسع معرّفة، والمتاح حسب التبويبات، والافتراضية حسب الدور', () => {
+  assert.deepEqual(Object.keys(E.RD_DEF), ['exec', 'cfo', 'accountant', 'sales', 'purchasing', 'inventory', 'hr', 'branch', 'ops']);
+  assert.equal(E.roleDashList('x', ALLD).length, 9);
+  assert.deepEqual(E.roleDashList('cashier', ['pos', 'closing']), ['sales', 'branch', 'ops'], 'الكاشير لا يرى المالية ولا الموارد البشرية');
+  assert.equal(E.roleDashDefault('cashier', ['pos', 'closing']), 'ops'); assert.equal(E.roleDashDefault('finance_department', ALLD), 'cfo');
+  assert.equal(E.roleDashDefault('general_management', ['acct']), 'exec'); assert.equal(E.roleDashDefault('cost_controller', ['pos']), 'sales', 'الافتراضي غير متاح ⇒ أول متاح');
+});
+
+test('اللوحة التنفيذية/المالية = أرقام الدفتر نفسها: إيراد مارس 3000 (3450 شاملة) مقابل فبراير 1000، مصروف 300، وصافي 2700', () => {
+  const D = E.roleDash(dOrg, dOps, 'exec', { td: '2026-03-25', allowed: ALLD }); const k = Object.fromEntries(D.kpis.map(x => [x.id, x]));
+  const A = E.buildAccounting(dOrg, dOps); let rev = 0; A.entries.filter(e => e.date.startsWith('2026-03')).forEach(e => e.lines.forEach(l => { if (/^4/.test(l.code)) rev += l.credit - l.debit; }));
+  assert.equal(k.rev.v, Math.round(rev * 100) / 100, 'من الدفتر'); assert.equal(k.rev.v, 4000, '(1150+2300+1150)/1.15'); assert.equal(k.rev.prev, 1000); assert.equal(k.rev.pct, 300);
+  assert.equal(k.net.v, k.rev.v - k.exp.v); assert.equal(k.pend.v, 0); assert.equal(D.trend.length, 6); assert.equal(D.trend[5].m, '2026-03');
+  const C = Object.fromEntries(E.roleDash(dOrg, dOps, 'cfo', { td: '2026-03-25', allowed: ALLD }).kpis.map(x => [x.id, x]));
+  assert.equal(C.ap.v, 1150, 'ذمم الموردين'); assert.ok('vat' in C && 'cash' in C);
+});
+
+test('لوحات التشغيل: المحاسب والمشتريات والموارد البشرية والفرع بأرقام محسوبة يدويًا', () => {
+  const g = (kind, o = {}) => Object.fromEntries(E.roleDash(dOrg, dOps, kind, { td: '2026-03-25', allowed: ALLD, ...o }).kpis.map(x => [x.id, x]));
+  assert.equal(g('accountant').jpend.v, 1); assert.equal(g('accountant').jm.v, 2);
+  const P = g('purchasing'); assert.equal(P.due.v, 1); assert.equal(P.dueAmt.v, 1150); assert.equal(P.pur.v, 1150);
+  const H = g('hr'); assert.equal(H.emp.v, 2); assert.equal(H.payroll.v, 6000 + 1600, '6000 + (16→31 مارس = 16 يومًا × 3000/30 = 1600)');
+  const B = g('branch', { branchIds: ['b1'] }); assert.equal(B.month.v, 4600, 'المحتسبة لفرعه فقط (المسودة وفرع آخر لا)'); assert.equal(B.deficit.v, 40); assert.equal(B.draft.v, 0);
+  assert.equal(g('branch', { branchIds: ['b2'] }).draft.v, 1, 'فرع النخيل يرى مسودته فقط');
+});
+
+test('لوحات الأدوار: لا مؤشر يفتح شاشة خارج الصلاحية', () => {
+  const D = E.roleDash(dOrg, dOps, 'exec', { td: '2026-03-25', allowed: ['acct'] });
+  assert.ok(D.kpis.every(k => k.tab === '' || k.tab === 'acct'), 'treasury/approve غير مسموحين ⇒ بلا انتقال');
+});

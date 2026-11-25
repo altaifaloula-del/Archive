@@ -3530,7 +3530,7 @@ export { jeLive, jeOwner, canApproveJe, jeAutoSt, vatCloseLive, WF_DOCS, wfTiers
 export { gosiNewSched, gosiNewAuto };   // v47.2 الرواتب   // v46.8 مرتجع نقطة البيع   // v46.8: للاختبارات الوظيفية (حارس الإقفال)
 export { findDupClosings, clDayKey, clrKeyId, yearEndDates, yearEndNext, payFactor, POS_HOLD_MAX, posHolds, posHoldsSet, posHoldPut, posHoldRecall };
 export { rptPivot, rptTpl, RPT_TPL_ALIAS };
-export { tnRemember, tnHref, tnOkId };
+export { tnRemember, tnHref, tnOkId, RD_DEF, RD_ROLE, roleDash, roleDashList, roleDashDefault };
 export { salesInvoiceHtml, gsearch, gsNorm, kbAction, KB_SHORTCUTS, GlobalSearch };
 export { TB_NEUTRAL, TB_TPL_INV, TB_TPL_RPT, TB_PAPER, TB_IMG_MAX, tbNorm, tenantBrand, tbCss, tbHeadHtml, tbLogo, tbImg };   // v56.0 هوية المنشأة   // v56.0 (GAP-002) الحارس المركزي لتكرار الإغلاق
 if (typeof window !== 'undefined' && !window.__mizanErrHook) {
@@ -12665,6 +12665,127 @@ function MyWork({ org, ops, me, myBranches, setTab, openAcctView, openInvView, d
       </div>)}</div>}
     </div>);
 }
+/* ============================================================
+   v56.0 — لوحات الأدوار التسع (أمر التصميم 5.5–5.6) — عرض فقط من المحرك القائم، بلا أي منطق حسابي جديد:
+   الإيراد والمصروف والربح والنقد والذمم من buildAccounting، والرواتب من payrollRowsOf، والنفاد من stockShortages…
+   كل لوحة تتطلب تبويبات بياناتها؛ لا تظهر لوحة ولا يفتح مؤشر شاشة خارج صلاحية المستخدم. المقارنة بالشهر السابق.
+   ============================================================ */
+const RD_DEF = {
+  exec: { ar: 'الإدارة العليا', need: ['acct', 'analytics', 'reporting'] },
+  cfo: { ar: 'المدير المالي', need: ['acct'] },
+  accountant: { ar: 'المحاسب', need: ['acct'] },
+  sales: { ar: 'مدير المبيعات', need: ['sales', 'pos'] },
+  purchasing: { ar: 'مدير المشتريات', need: ['purchasing'] },
+  inventory: { ar: 'مدير المخزون', need: ['inv'] },
+  hr: { ar: 'مدير الموارد البشرية', need: ['people', 'hrops'] },
+  branch: { ar: 'مدير الفرع', need: ['closing'] },
+  ops: { ar: 'المستخدم التشغيلي', need: ['pos', 'closing'] } };
+const RD_ROLE = { general_management: 'exec', head_office: 'exec', system_admin: 'exec', finance_department: 'cfo', accountant: 'accountant', accountant_view: 'accountant',
+  cost_controller: 'inventory', branch_manager: 'branch', regional_manager: 'branch', cashier: 'ops' };
+/** اللوحات المتاحة لمن يملك هذه التبويبات (أي تبويب من need يكفي) — والافتراضية حسب الدور */
+function roleDashList(role, allowed) { const A = allowed || []; return Object.keys(RD_DEF).filter(k => RD_DEF[k].need.some(t => A.includes(t))); }
+const roleDashDefault = (role, allowed) => { const L = roleDashList(role, allowed), d = RD_ROLE[role]; return L.includes(d) ? d : (L[0] || ''); };
+const rdPct = (v, p) => (p == null || !isFinite(p) || Math.abs(p) < 0.005) ? null : Math.round(((v - p) / Math.abs(p)) * 1000) / 10;
+/** مؤشرات لوحة (دالة نقية): { kind, kpis: [{ id, ar, v, prev, fmt, good: 'up'|'down', tab }], trend: [{ m, v }], trendAr } */
+function roleDash(org, ops, kind, opt = {}) {
+  const td = opt.td || today(), m = td.slice(0, 7), pm = prevMonthOf(td), allowed = opt.allowed || [], brIds = opt.branchIds || null;
+  const tabOk = (t) => allowed.includes(t) ? t : '';
+  const O = ops || {}, G = org || {};
+  const inM = (d, mm) => String(d || '').slice(0, 7) === mm;
+  const months = Array.from({ length: 6 }, (_, i) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo - 1 - (5 - i), 1)).toISOString().slice(0, 7); });
+  let A = null; const acc = () => { if (!A) { try { A = buildAccounting(G, O); } catch { A = { entries: [], accounts: [] }; } } return A; };
+  const kindOf = () => { const K = {}; (acc().accounts || []).forEach(a => { K[a.code] = a.kind; }); return K; };
+  const pl = (mm) => { const K = kindOf(); let rev = 0, exp = 0; acc().entries.forEach(e => { if (e.closing || !inM(e.date, mm)) return; e.lines.forEach(l => { if (K[l.code] === 'rev') rev += l.credit - l.debit; else if (K[l.code] === 'exp') exp += l.debit - l.credit; }); });
+    return { rev: Math.round(rev * 100) / 100, exp: Math.round(exp * 100) / 100, net: Math.round((rev - exp) * 100) / 100 }; };
+  const bal = (pred, upto) => { let b = 0; acc().entries.forEach(e => { if (upto && String(e.date || '') > upto) return; e.lines.forEach(l => { if (pred(l.code)) b += l.debit - l.credit; }); }); return Math.round(b * 100) / 100; };
+  const pmEnd = monthEnd(pm);
+  const brOk = (b) => !brIds || brIds.includes(b);
+  const clsRev = (mm, d) => sum((O.closings || []).filter(c => countedClosing(c) && brOk(c.branchId) && (d ? c.date === d : inM(c.date, mm))), c => c.totalRevenue);
+  const siRev = (mm) => sum((O.salesInvoices || []).filter(x => inM(x.date, mm) && x.kind !== 'credit'), x => x.total);
+  const purch = (mm) => sum((O.invoices || []).filter(i => inM(i.date, mm) && (i.amount || 0) > 0), i => i.amount);
+  const K = [], push = (id, ar, v, prev, fmt, good, tab) => K.push({ id, ar, v: Math.round((Number(v) || 0) * 100) / 100, prev: prev == null ? null : Math.round((Number(prev) || 0) * 100) / 100, fmt, good, tab: tabOk(tab) });
+  let trend = [], trendAr = '';
+  if (kind === 'exec' || kind === 'cfo') {
+    const a = pl(m), b = pl(pm);
+    push('rev', 'الإيرادات — الشهر', a.rev, b.rev, 'money', 'up', 'acct'); push('exp', 'المصروفات — الشهر', a.exp, b.exp, 'money', 'down', 'acct'); push('net', 'صافي الربح — الشهر', a.net, b.net, 'money', 'up', 'acct');
+    const cashP = (c) => /^1[12]/.test(c); push('cash', 'النقد والبنوك', bal(cashP), bal(cashP, pmEnd), 'money', 'up', 'treasury');
+    if (kind === 'cfo') { push('ar', 'ذمم العملاء والتطبيقات', bal(c => /^13/.test(c)), bal(c => /^13/.test(c), pmEnd), 'money', 'down', 'acct');
+      push('ap', 'ذمم الموردين', -bal(c => c === '2101'), -bal(c => c === '2101', pmEnd), 'money', 'down', 'purchasing');
+      push('vat', 'ضريبة مخرجات − مدخلات', -bal(c => c === '2301') - bal(c => c === '1501'), null, 'money', 'down', 'acct'); }
+    else { push('pend', 'إغلاقات بانتظار الاعتماد', (O.closings || []).filter(c => c.status === 'submitted').length, null, 'int', 'down', 'approve'); }
+    trend = months.map(mm => ({ m: mm, v: pl(mm).net })); trendAr = 'صافي الربح — آخر 6 أشهر';
+  } else if (kind === 'accountant') {
+    const J = O.journalManual || [];
+    push('jpend', 'قيود بانتظار الاعتماد', J.filter(j => j.status === 'pending').length, null, 'int', 'down', 'acct');
+    push('jm', 'قيود يدوية — الشهر', J.filter(j => inM(j.date, m)).length, J.filter(j => inM(j.date, pm)).length, 'int', '', 'acct');
+    push('pinv', 'فواتير موردين — الشهر', (O.invoices || []).filter(i => inM(i.date, m)).length, (O.invoices || []).filter(i => inM(i.date, pm)).length, 'int', '', 'purchasing');
+    push('cv', 'سندات قبض وصرف — الشهر', (O.cashVouchers || []).filter(v => inM(v.date, m)).length, (O.cashVouchers || []).filter(v => inM(v.date, pm)).length, 'int', '', 'acct');
+    const lt = lockedThru(G); K.push({ id: 'lock', ar: 'آخر شهر مقفل', v: lt || '—', prev: null, fmt: 'text', good: '', tab: tabOk('acct') });
+    trend = months.map(mm => ({ m: mm, v: J.filter(j => inM(j.date, mm)).length })); trendAr = 'القيود اليدوية — آخر 6 أشهر';
+  } else if (kind === 'sales') {
+    const v = (mm) => clsRev(mm) + siRev(mm);
+    push('sales', 'المبيعات — الشهر (شامل)', v(m), v(pm), 'money', 'up', 'sales');
+    const P = (mm) => (O.posOrders || []).filter(o => o.status === 'paid' && inM(o.date, mm) && brOk(o.branchId));
+    push('orders', 'فواتير نقطة البيع — الشهر', P(m).length, P(pm).length, 'int', 'up', 'pos');
+    const avg = (L) => L.length ? sum(L, o => o.total) / L.length : 0; push('avg', 'متوسط الفاتورة', avg(P(m)), avg(P(pm)), 'money', 'up', 'pos');
+    push('si', 'فواتير المبيعات — الشهر', siRev(m), siRev(pm), 'money', 'up', 'sales');
+    trend = months.map(mm => ({ m: mm, v: v(mm) })); trendAr = 'المبيعات — آخر 6 أشهر';
+  } else if (kind === 'purchasing') {
+    push('pur', 'المشتريات — الشهر', purch(m), purch(pm), 'money', '', 'purchasing');
+    const due = (O.invoices || []).filter(i => (i.amount || 0) > 0 && (i.amount - (i.paidAmount || 0)) > 0.004 && i.dueDate && i.dueDate <= td);
+    push('due', 'فواتير مستحقة غير مسددة', due.length, null, 'int', 'down', 'purchasing'); push('dueAmt', 'قيمة المستحق', sum(due, i => i.amount - (i.paidAmount || 0)), null, 'money', 'down', 'purchasing');
+    push('po', 'أوامر شراء بانتظار الاستلام', (O.purchaseOrders || []).filter(p => ['open', 'partial'].includes(p.status)).length, null, 'int', '', 'purchasing');
+    trend = months.map(mm => ({ m: mm, v: purch(mm) })); trendAr = 'المشتريات — آخر 6 أشهر';
+  } else if (kind === 'inventory') {
+    let sh = []; try { sh = stockShortages(G, O) || []; } catch { sh = []; }
+    push('short', 'أصناف ناقصة أو نافدة', sh.length, null, 'int', 'down', 'inv');
+    const mv = (mm, k) => (O.whMoves || []).concat(O.stockMoves || []).filter(x => x.kind === k && inM(x.date, mm));
+    push('waste', 'حركات هدر — الشهر', mv(m, 'waste').length, mv(pm, 'waste').length, 'int', 'down', 'inv');
+    push('adj', 'تسويات جرد — الشهر', mv(m, 'adjust').length, mv(pm, 'adjust').length, 'int', 'down', 'inv');
+    push('items', 'الأصناف المخزنية', (G.items || []).length, null, 'int', '', 'inv');
+    trend = months.map(mm => ({ m: mm, v: mv(mm, 'waste').length })); trendAr = 'حركات الهدر — آخر 6 أشهر';
+  } else if (kind === 'hr') {
+    const emps = (G.employees || []).filter(e => brOk(e.branchId));
+    const act = emps.filter(e => e.isActive !== false);
+    push('emp', 'الموظفون النشطون', act.length, null, 'int', '', 'people');
+    const gross = (mm) => { try { return sum(payrollRowsOf(G, O.advances || [], emps, mm), r => r.gross); } catch { return 0; } };
+    push('payroll', 'إجمالي الرواتب — الشهر', gross(m), gross(pm), 'money', '', 'people');
+    push('leave', 'طلبات إجازة معلّقة', (O.leaveRequests || []).filter(x => x.status === 'pending' && brOk(x.branchId)).length, null, 'int', 'down', 'hrops');
+    const att = new Set((O.attendanceEvents || []).filter(x => String(x.at || '').slice(0, 10) === td && brOk(x.branchId)).map(x => x.employeeId));
+    push('att', 'حضروا اليوم', att.size, null, 'int', 'up', 'hrops');
+    trend = months.map(mm => ({ m: mm, v: gross(mm) })); trendAr = 'إجمالي الرواتب — آخر 6 أشهر';
+  } else if (kind === 'branch' || kind === 'ops') {
+    const C = (O.closings || []).filter(c => brOk(c.branchId));
+    push('today', 'مبيعات اليوم', clsRev(null, td) || sum((O.posOrders || []).filter(o => o.status === 'paid' && o.date === td && brOk(o.branchId)), o => o.total), null, 'money', 'up', 'closing');
+    push('month', 'مبيعات الشهر', clsRev(m), clsRev(pm), 'money', 'up', 'closing');
+    push('draft', 'إغلاقات مسودة', C.filter(c => c.status === 'draft').length, null, 'int', 'down', 'closing');
+    const def = (mm) => sum(C.filter(c => countedClosing(c) && inM(c.date, mm) && (c.variance || 0) < 0), c => -c.variance);
+    if (kind === 'branch') push('deficit', 'عجز الصندوق — الشهر', def(m), def(pm), 'money', 'down', 'closing');
+    else push('orders', 'فواتير اليوم', (O.posOrders || []).filter(o => o.status === 'paid' && o.date === td && brOk(o.branchId)).length, null, 'int', 'up', 'pos');
+    trend = months.map(mm => ({ m: mm, v: clsRev(mm) })); trendAr = 'مبيعات الفرع — آخر 6 أشهر';
+  }
+  return { kind, kpis: K.map(k => ({ ...k, pct: typeof k.v === 'number' ? rdPct(k.v, k.prev) : null })), trend, trendAr };
+}
+function RoleDashboard({ org, ops, me, myBranches, allowed, setTab }) {
+  const L = roleDashList(me.role, allowed);
+  const [kind, setKind] = useState(() => { try { const v = localStorage.getItem('mz-rdash:' + me.id); if (v && L.includes(v)) return v; } catch { } return roleDashDefault(me.role, allowed); });
+  const brIds = (ROLES[me.role] || {}).scope === 'all' ? null : (myBranches || []).map(b => b.id);
+  const D = useMemo(() => kind ? roleDash(org, ops, kind, { allowed, branchIds: brIds }) : null, [org, ops, kind, allowed.join(','), (brIds || []).join(',')]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!L.length || !D) return null;
+  const pick = (k) => { setKind(k); try { localStorage.setItem('mz-rdash:' + me.id, k); } catch { } };
+  const fmt = (k) => k.fmt === 'money' ? money(k.v) : k.fmt === 'int' ? String(k.v) : String(k.v);
+  const mx = Math.max(1, ...D.trend.map(t => Math.abs(t.v)));
+  return <div className="lh-sec rd" data-roledash={kind}>
+    <div className="rd-h"><div className="lh-sect">{TX('لوحة') + ' ' + TX(RD_DEF[kind].ar)}</div>
+      {L.length > 1 && <select className="sel rd-sel" value={kind} onChange={e => pick(e.target.value)} aria-label={TX('اختر اللوحة')} data-roledash-pick>{L.map(k => <option key={k} value={k}>{TX(RD_DEF[k].ar)}</option>)}</select>}</div>
+    <div className="rd-k">{D.kpis.map(k => { const good = k.pct == null || !k.good ? '' : ((k.pct > 0) === (k.good === 'up') ? 'ok' : 'bad');
+      return <button key={k.id} type="button" className="rd-c" data-rd-kpi={k.id} disabled={!k.tab} onClick={() => k.tab && setTab(k.tab)} title={k.tab ? TX('فتح التفاصيل') : ''}>
+        <span className="rd-l">{TX(k.ar)}</span><b className="num">{fmt(k)}</b>
+        {k.pct != null ? <span className={'rd-d ' + good}>{k.pct > 0 ? '▲' : '▼'} <span className="num">{Math.abs(k.pct)}%</span> <small>{TX('عن الشهر السابق')}</small></span> : <span className="rd-d" />}</button>; })}</div>
+    {D.trend.length > 0 && <div className="rd-t" data-rd-trend><div className="rd-tl">{TX(D.trendAr)}</div><div className="rd-bars">{D.trend.map(t =>
+      <div key={t.m} className="rd-bar" title={t.m + ': ' + (D.kpis[0] && D.kpis[0].fmt === 'int' ? t.v : money(t.v))}><i style={{ height: Math.max(2, Math.round(Math.abs(t.v) / mx * 56)) + 'px' }} className={t.v < 0 ? 'neg' : ''} /><span className="num">{t.m.slice(5)}</span></div>)}</div></div>}
+  </div>;
+}
 function Launcher({ org, ops, me, myBranches, scoped, setTab, openAcctView, openInvView }) {
   const [q, setQ] = useState('');
   const [tasksOpen, setTasksOpen] = useState(false);   // v55.0 لوحة «مهامي» الجانبية
@@ -12874,6 +12995,7 @@ function Launcher({ org, ops, me, myBranches, scoped, setTab, openAcctView, open
         <button type="button" className="lh-tasks" data-tasksbtn onClick={() => setTasksOpen(true)}><ListChecks size={17} />{TX('مهامي')}<span className="n" data-mywork-n>{workEv.length}</span></button>
       </div>
       {!qq && kpis.length > 0 && <div className="lh-kpis" data-homekpis>{kpis.map(k => <button key={k.id} type="button" className="lh-kpi" data-homekpi={k.id} style={{ '--k': k.tone }} onClick={() => setTab(k.tab)}><i aria-hidden="true" /><span><small>{k.ar}</small><b className="num">{k.v}</b></span></button>)}</div>}
+      {!qq && <RoleDashboard org={org} ops={scoped || ops} me={me} myBranches={myBranches} allowed={[...((ROLES[me.role] || {}).tabs || []), ...(me.appAllow || []).map(id => ((LAUNCH_IX[id] || {}).open || {}).tab).filter(Boolean)]} setTab={setTab} />}   {/* v56.0 لوحات الأدوار */}
       {tasksOpen && <><div className="lh-drawer-bg" onClick={() => setTasksOpen(false)} /><aside className="lh-drawer" role="dialog" aria-label="مهامي"><MyWork org={org} ops={ops} me={me} myBranches={myBranches} setTab={setTab} openAcctView={openAcctView} openInvView={openInvView} drawer onClose={() => setTasksOpen(false)} /></aside></>}
 
       {qq && matchedSecs.length > 0 && (
