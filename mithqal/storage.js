@@ -1,0 +1,737 @@
+/**
+ * طبقة التخزين السحابي للمنصة — ثلاث طبقات بالترتيب:
+ *  1) Firestore        → مزامنة لحظية بين كل الفروع (يُفعَّل تلقائياً عند ضبط متغيرات VITE_FIREBASE_*)
+ *  2) خادم المشروع     → /api/store عند غياب إعدادات Firebase
+ *  3) تخزين المتصفح    → احتياطي عند انقطاع الشبكة
+ * واجهة موحّدة: cloud.get / cloud.set / cloud.subscribe — لا يعلم باقي التطبيق أي طبقة تعمل.
+ */
+
+export const KEYS = {
+  org: 'rms8:org',       // المنشأة كاملة (أسرار: كلمات مشفرة، رواتب، إعدادات) — للإدارة
+  dir: 'rms8:dir',       // v9: دليل عام منزوع الأسرار — يقرؤه كل الأعضاء
+  core: 'rms8:core',     // v9: بيانات تشغيل مركزية — لأدوار المركز فقط
+  ops: 'rms8:ops',       // الهيكل القديم — يُجمَّد بعد الهجرة ويبقى نسخة تاريخية
+  pulse: 'rms8:pulse',
+  loy: 'rms8:loy',       // v34.0: عملاء الولاء ورصيد نقاطهم — مشترك بين كل الفروع
+  files: 'rms8:files',   // الهيكل القديم للأرشيف — بعد الهجرة لكل فرع مستنده bf_
+  hist: 'rms8:hist'
+};
+// v9: مستند لكل فرع (تشغيله وأرشيف صوره) — العزل الفعلي يفرضه الخادم عبر القواعد
+export const brKey = (branchId) => 'rms8:br_' + branchId;
+export const bfKey = (branchId) => 'rms8:bf_' + branchId;
+
+export const kb = (o) => Math.round(JSON.stringify(o || {}).length / 1024);
+
+/* ================= إعدادات Firebase ================= */
+// v51.0 (S1): إعداد Firebase والمجموعة من طبقة المستأجر (tenant.js) — الافتراضي = متغيرات البناء نفسها (الطيف كما هو)
+import { TENANT } from './tenant.js';
+const E = import.meta.env || {};
+const FB = TENANT.firebase;
+const FB_READY = !!(FB.apiKey && FB.projectId);
+const COL = TENANT.collection;
+// v28.1: التقسيم بالبايت لا بعدد الأحرف — الحرف العربي بايتان في UTF-8 وحد مستند Firestore ميبيبايت واحد
+const CHUNK_BYTES = 900000;
+const MAX_PARTS = 500;          // سقف أجزاء المستند الواحد (يطابق قواعد Firestore) — يمنع حلقات قراءة لا تنتهي
+const BATCH_MAX_PARTS = 10;     // حتى 10 أجزاء تُكتب مع رأسها في دفعة ذرّية واحدة (دون حد طلب 10MiB)
+const docId = (k) => k.replace(/[^\w-]/g, '_');
+
+/** يقسم نصًا إلى أجزاء لا يتجاوز كل منها maxBytes بترميز UTF-8، دون شطر أزواج البدائل */
+export function splitUtf8(s, maxBytes = CHUNK_BYTES) {
+  const out = [];
+  let start = 0, bytes = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    const pair = c >= 0xD800 && c <= 0xDBFF && i + 1 < s.length;
+    const n = c < 0x80 ? 1 : c < 0x800 ? 2 : pair ? 4 : 3;
+    if (bytes + n > maxBytes && i > start) { out.push(s.slice(start, i)); start = i; bytes = 0; }
+    bytes += n;
+    if (pair) i++;
+  }
+  out.push(s.slice(start));
+  return out;
+}
+
+let fs = null;      // وحدات Firestore المحمّلة كسولاً
+let fsFailed = false;
+let _fbAppP = null;
+
+// v28.1: مفاتيح تعذّرت قراءتها من السحابة (خطأ أو مستند تالف) — تُرفض الكتابة عليها حتى تنجح قراءة لاحقة،
+// كي لا تُكتب نسخة فارغة أو قديمة فوق بيانات لم نستطع قراءتها
+const failedReads = new Set();
+// v34.1: سبب آخر قراءة فاشلة لكل مستند — يُعرض للمستخدم بدل رسالة عامة
+const readErrs = new Map();
+// v34.16: نفاد حصة Firestore (resource-exhausted) — لا نكرر المحاولة 15 دقيقة (التكرار كان يستهلك الحصة أكثر)
+let quotaUntil = 0;
+const isQuota = (e) => !!e && /resource-exhausted|RESOURCE_EXHAUSTED/.test(String(e.code || '') + ' ' + String(e.message || ''));
+const quotaBlocked = (key) => { if (Date.now() < quotaUntil) { cloud.lastError = { key, op: 'set', code: 'resource-exhausted', at: Date.now(), until: quotaUntil }; return true; } return false; };
+const isDenied = (e) => !!e && (e.code === 'permission-denied' || e.code === 'PERMISSION_DENIED');
+// v34.1: إعادة القراءة عند الأخطاء العابرة (شبكة الجوال، انتهاء المهلة) قبل اعتبار المستند غير مقروء
+async function fsReadRetry(f, key) {
+  let last;
+  for (let i = 0; i < 3; i++) {
+    try { const v = i === 0 ? await fsRead(f, key) : await fsReadTx(f, key); readErrs.delete(key); return v; }
+    catch (e) { last = e; if (isDenied(e)) break; await new Promise(r => setTimeout(r, 400 * (i + 1))); }
+  }
+  readErrs.set(key, { code: String((last && last.code) || 'unknown'), msg: String((last && last.message) || last || '').slice(0, 160), at: Date.now() });
+  throw last;
+}
+// v29.0: بصمة رأس آخر نسخة قُرئت كاملة لكل مستند (updatedAt|parts). أول لقطة يرسلها الاستماع اللحظي
+// بعد الإقلاع تحمل نفس البصمة غالبًا — كانت تُعيد تنزيل المستند كاملًا (بكل أجزائه) بلا أي تغيير.
+const loadedStamp = new Map();
+const stampOf = (d) => (d && d.updatedAt != null) ? (d.updatedAt + '|' + (d.parts || 1) + (d.ver ? '|' + d.ver : '')) : null;
+// v34.6: معرّف الجزء — الأجزاء المُصدَّرة (ver) تُكتب باسم جديد ثم يُحوَّل الرأس إليها ذريًا؛ القديمة بلا ver تبقى مقروءة
+const chunkRef = (f, key, ver, i) => f.doc(f.db, COL, docId(key) + '__' + (ver ? ver + '_' : '') + i);
+const CHUNK_BATCH = 4;   // 4 × 900KB ≈ 3.6MB لكل دفعة — هامش واسع تحت حد الطلب الواحد (10MiB) وأسرع على شبكة الجوال
+// v34.7: ذاكرة الجلسة للمستندات متعددة الأجزاء: إن لم يتغير الرأس (نفس البصمة) نعيد النسخة المحفوظة بدل تنزيل كل الأجزاء
+// (المستند الكبير كان يُنزَّل كاملًا مع كل حفظ — يستهلك حصة القراءة والنقل ويُبطئ الجوال). localStorage لا يتسع للكبير.
+const memDocs = new Map();   // key → { st, v }
+
+// تطبيق Firebase واحد مشترك بين المصادقة وقاعدة البيانات
+async function fbApp() {
+  if (!FB_READY) return null;
+  if (!_fbAppP) {
+    _fbAppP = (async () => {
+      const { initializeApp, getApps, getApp } = await import('firebase/app');
+      return getApps().length ? getApp() : initializeApp(FB);
+    })();
+  }
+  return _fbAppP;
+}
+
+async function fbAuthMod() {
+  const app = await fbApp();
+  if (!app) return null;
+  const A = await import('firebase/auth');
+  const a = A.getAuth(app);
+  if (E.VITE_AUTH_EMULATOR && !a.emulatorConfig) { try { A.connectAuthEmulator(a, 'http://' + E.VITE_AUTH_EMULATOR, { disableWarnings: true }); } catch { } }
+  return { A, a };
+}
+
+// المستخدم الموثّق حاليًا (بعد استقرار حالة الجلسة) — لا دخول مجهولًا بعد الآن
+async function authedUser() {
+  const m = await fbAuthMod();
+  if (!m) return null;
+  await new Promise(res => { const un = m.A.onAuthStateChanged(m.a, () => { un(); res(); }); });
+  return m.a.currentUser || null;
+}
+
+async function firestore() {
+  if (!FB_READY || fsFailed) return null;
+  if (fs) return fs;
+  try {
+    // لا وصول لقاعدة البيانات دون جلسة مصادقة حقيقية — تُنشأ من بوابة الدخول
+    const u = await authedUser();
+    if (!u) return null;
+    const app = await fbApp();
+    const sdk = await import('firebase/firestore');
+    let db;
+    try {
+      db = sdk.initializeFirestore(app, { localCache: sdk.persistentLocalCache({}) });
+    } catch {
+      db = sdk.getFirestore(app);   // مهيأة مسبقاً أو متصفح لا يدعم التخزين الدائم
+    }
+    // للاختبارات فقط: محاكي Firestore المحلي (لا يُضبط في الإنتاج)
+    if (E.VITE_FS_EMULATOR) { try { const [h, pt] = String(E.VITE_FS_EMULATOR).split(':'); sdk.connectFirestoreEmulator(db, h, Number(pt)); } catch { } }
+    fs = { db, ...sdk };
+    return fs;
+  } catch (e) {
+    console.warn('تعذّر تحميل Firestore — سيتم استخدام خادم المشروع.', e);
+    fsFailed = true;
+    return null;
+  }
+}
+
+/* ================= المصادقة الحقيقية (بريد + كلمة سر لكل مستخدم) ================= */
+// v31.3 — التحقق بخطوتين (TOTP عبر تطبيق المصادقة): يفرضه Firebase نفسه بعد التسجيل — كلمة السر وحدها لا تكفي
+let mfaResolver = null, mfaSecret = null;
+// v31.10 — رسائل المصادقة (توثيق البريد/تعيين كلمة السر) بالعربية، ورابط عودة للمنصة بعد إتمام الإجراء
+function arMail(m) { try { m.a.languageCode = 'ar'; } catch { } }
+function backUrl() { try { return location.origin + location.pathname; } catch { return undefined; } }
+const actSettings = () => { const url = backUrl(); return url && /^https:\/\//.test(url) ? { url, handleCodeInApp: false } : undefined; };
+const mfaErr = (code) => { const e = new Error(code); e.code = code; return e; };
+async function reauthIf(m, u, pass, code) {
+  if (!pass) return;
+  const cred = m.A.EmailAuthProvider.credential(u.email, pass);
+  try { await m.A.reauthenticateWithCredential(u, cred); }
+  catch (e) {
+    // v31.9: حساب مفعّل بخطوتين — إعادة التحقق تتطلب رمز التطبيق أيضًا
+    if (e && e.code === 'auth/multi-factor-auth-required') {
+      if (!code) throw mfaErr('mfa-code-needed');
+      const r = m.A.getMultiFactorResolver(m.a, e);
+      const h = r.hints.find(x => x.factorId === 'totp'); if (!h) throw mfaErr('mfa-unsupported');
+      await r.resolveSignIn(m.A.TotpMultiFactorGenerator.assertionForSignIn(h.uid, String(code).replace(/\D/g, '')));
+      return;
+    }
+    throw e;
+  }
+}
+/* ================= v45.9 — إشعارات الجوال والمنصة مغلقة (Firebase Cloud Messaging) =================
+   يُفعَّل لكل جهاز من مركز التنبيهات. الرمز يُحفظ في pushTokens باسم بريد المستخدم فقط؛
+   الدور والفروع يحددها الخادم من بيانات المنشأة (لا يثق بما يرسله الجهاز). يتطلب مفتاح VAPID العام في VITE_FCM_VAPID_KEY. */
+const VAPID = E.VITE_FCM_VAPID_KEY || '';
+const PUSH_LS = 'rms8:push';
+async function pushReg() {
+  const reg = await navigator.serviceWorker.register('push-sw.js', { scope: './push/' });
+  for (let i = 0; i < 50 && !reg.active; i++) await new Promise(r => setTimeout(r, 100));
+  if (!reg.active) throw new Error('push-sw-not-active');
+  return reg;
+}
+async function tokenId(t) { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(h)].slice(0, 20).map(b => b.toString(16).padStart(2, '0')).join(''); }
+export const pushApi = {
+  get configured() { return FB_READY && !!VAPID; },
+  get supported() { try { return typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof window.PushManager !== 'undefined' && typeof Notification !== 'undefined'; } catch { return false; } },
+  get standaloneNeeded() { try { return /iPhone|iPad|iPod/.test(navigator.userAgent) && !(window.matchMedia('(display-mode: standalone)').matches || navigator.standalone); } catch { return false; } },
+  isOn() { try { return !!localStorage.getItem(PUSH_LS) && Notification.permission === 'granted'; } catch { return false; } },
+  async enable() {
+    if (!this.configured) throw new Error('push-not-configured');
+    if (!this.supported) throw new Error(this.standaloneNeeded ? 'push-ios-install' : 'push-unsupported');
+    let perm = Notification.permission; if (perm === 'default') perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw new Error('push-denied');
+    const u = await authedUser(); if (!u || !u.email) throw new Error('push-no-user');
+    const reg = await pushReg();
+    const M = await import('firebase/messaging');
+    if (!(await M.isSupported())) throw new Error('push-unsupported');
+    const token = await M.getToken(M.getMessaging(await fbApp()), { vapidKey: VAPID, serviceWorkerRegistration: reg });
+    if (!token) throw new Error('push-no-token');
+    const f = await firestore(); if (!f) throw new Error('push-no-db');
+    const id = await tokenId(token);
+    await f.setDoc(f.doc(f.db, 'pushTokens', id), { email: u.email.toLowerCase(), token, ua: String(navigator.userAgent || '').slice(0, 160), at: Date.now() });
+    try { localStorage.setItem(PUSH_LS, id); } catch { }
+    return true;
+  },
+  async disable() {
+    let id = ''; try { id = localStorage.getItem(PUSH_LS) || ''; localStorage.removeItem(PUSH_LS); } catch { }
+    try { const M = await import('firebase/messaging'); const reg = await navigator.serviceWorker.getRegistration('./push/'); if (reg) { await M.deleteToken(M.getMessaging(await fbApp())).catch(() => { }); await reg.unregister(); } } catch { }
+    if (id) { try { const f = await firestore(); if (f) await f.deleteDoc(f.doc(f.db, 'pushTokens', id)); } catch { } }
+    return true;
+  }
+};
+
+export const authApi = {
+  get enabled() { return FB_READY; },
+
+  /** الجلسة الحالية إن وُجدت */
+  async ready() {
+    const u = await authedUser();
+    return u ? { email: (u.email || '').toLowerCase() } : null;
+  },
+
+  async signIn(email, pass) {
+    const m = await fbAuthMod(); if (!m) throw new Error('no-firebase');
+    try { await m.A.setPersistence(m.a, m.A.browserLocalPersistence); } catch { }
+    try {
+      const cred = await m.A.signInWithEmailAndPassword(m.a, email.trim(), pass);
+      return { email: (cred.user.email || '').toLowerCase() };
+    } catch (e) {
+      if (e && e.code === 'auth/multi-factor-auth-required') {
+        mfaResolver = m.A.getMultiFactorResolver(m.a, e);
+        if (!mfaResolver.hints.some(h => h.factorId === 'totp')) throw mfaErr('mfa-unsupported');
+        throw mfaErr('mfa-required');
+      }
+      throw e;
+    }
+  },
+
+  /** الخطوة الثانية للدخول: رمز تطبيق المصادقة (6 أرقام) */
+  async mfaVerify(code) {
+    const m = await fbAuthMod(); if (!m || !mfaResolver) throw mfaErr('mfa-expired');
+    const h = mfaResolver.hints.find(x => x.factorId === 'totp');
+    const as = m.A.TotpMultiFactorGenerator.assertionForSignIn(h.uid, String(code).replace(/\D/g, ''));
+    const cred = await mfaResolver.resolveSignIn(as);
+    mfaResolver = null;
+    return { email: (cred.user.email || '').toLowerCase() };
+  },
+
+  /** حالة التحقق بخطوتين للمستخدم الحالي: مسجّل؟ وهل استُخدم في هذه الجلسة؟ */
+  async mfaInfo() {
+    const m = await fbAuthMod(); const u = await authedUser(); if (!m || !u) return null;
+    const fs2 = m.A.multiFactor(u).enrolledFactors.filter(f => f.factorId === 'totp');
+    let used = false; try { const t = await u.getIdTokenResult(); used = !!(t.claims.firebase && t.claims.firebase.sign_in_second_factor); } catch { }
+    return { enrolled: fs2.length > 0, used, factors: fs2.map(f => ({ uid: f.uid, name: f.displayName || '', at: f.enrollmentTime || '' })) };
+  },
+
+  /** بدء التسجيل: يتحقق من كلمة السر ثم يولّد السر ورابط رمز QR */
+  async mfaStart(pass) {
+    const m = await fbAuthMod(); const u = await authedUser(); if (!m || !u) throw mfaErr('no-session');
+    await reauthIf(m, u, pass);
+    const session = await m.A.multiFactor(u).getSession();
+    mfaSecret = await m.A.TotpMultiFactorGenerator.generateSecret(session);
+    return { key: mfaSecret.secretKey, url: mfaSecret.generateQrCodeUrl(u.email || 'user', 'ميزان') };
+  },
+
+  /** إتمام التسجيل برمز من التطبيق */
+  async mfaFinish(code) {
+    const m = await fbAuthMod(); const u = await authedUser(); if (!m || !u || !mfaSecret) throw mfaErr('mfa-expired');
+    const as = m.A.TotpMultiFactorGenerator.assertionForEnrollment(mfaSecret, String(code).replace(/\D/g, ''));
+    await m.A.multiFactor(u).enroll(as, 'تطبيق المصادقة');
+    mfaSecret = null;
+    return true;
+  },
+
+  /** إلغاء التحقق بخطوتين (يتطلب كلمة السر ورمز التطبيق) */
+  async mfaRemove(pass, code) {
+    const m = await fbAuthMod(); const u = await authedUser(); if (!m || !u) throw mfaErr('no-session');
+    await reauthIf(m, u, pass, code);
+    const mf = m.A.multiFactor(u);
+    for (const f of mf.enrolledFactors.filter(x => x.factorId === 'totp')) await mf.unenroll(f);
+    return true;
+  },
+
+  /** التسجيل يتطلب بريدًا موثّقًا: إرسال رابط التوثيق ثم التحقق بعد فتحه */
+  async sendVerify() { const m = await fbAuthMod(); const u = await authedUser(); if (!m || !u) return false; arMail(m);
+    try { await m.A.sendEmailVerification(u, actSettings()); } catch (e) { if (String(e && e.code).includes('unauthorized-continue-uri') || String(e && e.code).includes('invalid-continue-uri')) await m.A.sendEmailVerification(u); else throw e; }
+    return true; },
+  async emailVerified() { const u = await authedUser(); if (!u) return false; try { await u.reload(); } catch { } return !!u.emailVerified; },
+
+  /** سياسة الإلزام (platform/security) — تقرؤها قواعد الأمان أيضًا فتُفرض على الخادم */
+  async getPolicy() {
+    const f = await firestore(); if (!f) return null;
+    try { const sn = await f.getDoc(f.doc(f.db, 'platform', 'security')); return sn.exists() ? (sn.data() || {}) : {}; } catch { return null; }
+  },
+  async setPolicy(p) {
+    const f = await firestore(); if (!f) return false;
+    try { await f.setDoc(f.doc(f.db, 'platform', 'security'), { roles: p.roles || [], admins: !!p.admins, at: Date.now() }); return true; } catch (e) { return false; }
+  },
+
+  /** الإعداد الأول بعد الترقية: ينشئ حساب المالك ويدخله */
+  async firstSetup(email, pass) {
+    const m = await fbAuthMod(); if (!m) throw new Error('no-firebase');
+    const cred = await m.A.createUserWithEmailAndPassword(m.a, email.trim(), pass);
+    return { email: (cred.user.email || '').toLowerCase() };
+  },
+
+  async signOutAll() { const m = await fbAuthMod(); if (m) await m.A.signOut(m.a); },
+
+  /** رمز هوية الجلسة الحالية (Firebase ID token) — يُرسل لوسيط الخادم كي يتحقق من العضوية */
+  async idToken() {
+    const u = await authedUser();
+    if (!u) return null;
+    try { return await u.getIdToken(); } catch { return null; }
+  },
+
+  /** v31.9 — تغيير كلمة السر ذاتيًا: تحقق بالكلمة الحالية (ورمز التطبيق إن كان مفعّلًا) ثم التحديث */
+  async changePassword(current, next, code) {
+    const m = await fbAuthMod(); const u = await authedUser(); if (!m || !u) throw mfaErr('no-session');
+    await reauthIf(m, u, current, code);
+    await m.A.updatePassword(u, next);
+    return true;
+  },
+
+  async resetPass(email) {
+    const m = await fbAuthMod(); if (!m) throw new Error('no-firebase');
+    arMail(m);
+    try { await m.A.sendPasswordResetEmail(m.a, (email || '').trim(), actSettings()); }
+    catch (e) { if (String(e && e.code).includes('continue-uri')) await m.A.sendPasswordResetEmail(m.a, (email || '').trim()); else throw e; }
+  },
+
+  /** إنشاء حساب مصادقة لموظف جديد دون إسقاط جلسة المدير (تطبيق ثانوي مؤقت) */
+  async createUser(email, pass) {
+    const { initializeApp, deleteApp } = await import('firebase/app');
+    const A = await import('firebase/auth');
+    const sec = initializeApp(FB, 'usr-' + Math.random().toString(36).slice(2));
+    try {
+      const sa = A.getAuth(sec);
+      await A.createUserWithEmailAndPassword(sa, (email || '').trim(), pass);
+      await A.signOut(sa);
+    } finally { try { await deleteApp(sec); } catch { } }
+  },
+
+  /** تمهيد ما بعد الدخول: قائمة المدراء تُنشأ مرة واحدة باسم أول داخل، وعضويته تُرسَّخ */
+  async bootstrap() {
+    const f = await firestore(); if (!f) return false;
+    const u = await authedUser(); if (!u) return false;
+    const email = (u.email || '').toLowerCase();
+    try {
+      const ref = f.doc(f.db, 'platform', 'admins');
+      const snap = await f.getDoc(ref);
+      if (!snap.exists()) await f.setDoc(ref, { emails: [email], at: Date.now() });
+    } catch { /* القائمة موجودة ولسنا مدراء — طبيعي */ }
+    try { await f.setDoc(f.doc(f.db, 'members', email), { email, active: true, at: Date.now() }, { merge: true }); } catch { /* الكتابة للمدراء فقط */ }
+    return true;
+  },
+
+  /** حالة عضويتي — تُفحص بعد الدخول لمنع تجربة مشوّشة لمن لا عضوية له */
+  async myMembership() {
+    const f = await firestore(); if (!f) return null;
+    const u = await authedUser(); if (!u) return null;
+    try {
+      const snap = await f.getDoc(f.doc(f.db, 'members', (u.email || '').toLowerCase()));
+      const d = snap.exists() ? (snap.data() || {}) : {};
+      // v27.1: نعيد أيضًا ما تعتمد عليه قواعد Firestore (الفرع/النطاق/الدور) كي تُشخِّص الواجهة أي تعارض مع سجل المستخدم في المنصة
+      return { exists: snap.exists(), active: snap.exists() && d.active === true, role: d.role || '', branchId: d.branchId || '', branchIds: Array.isArray(d.branchIds) ? d.branchIds : [], scope: d.scope || '' };
+    } catch { return { exists: false, active: false, role: '', branchId: '', branchIds: [], scope: '' }; }
+  },
+
+  /** عضوية مستخدم (يديرها المدراء): تفعيل/تعطيل + دوره وفرعه */
+  async upsertMember(email, data) {
+    const f = await firestore(); if (!f) return false;
+    const key = (email || '').toLowerCase();
+    try {
+      await f.setDoc(f.doc(f.db, 'members', key), { email: key, ...(data || {}), at: Date.now() }, { merge: true });
+      return true;
+    } catch { return false; }
+  },
+
+  /** مزامنة صفة «مدير» (كتابة الإعدادات) مع دور المستخدم */
+  async syncAdmin(email, makeAdmin) {
+    const f = await firestore(); if (!f) return false;
+    const key = (email || '').toLowerCase();
+    try {
+      await f.updateDoc(f.doc(f.db, 'platform', 'admins'), { emails: makeAdmin ? f.arrayUnion(key) : f.arrayRemove(key) });
+      return true;
+    } catch { return false; }
+  }
+};
+
+/* v34.9 — استخراج المستندات السليمة من نص تالف: كل عنصر يبدأ بـ {"id":" يُتتبَّع من بدايته بمحلّل يعرف السلاسل والهروب
+   حتى قوسه المغلق ثم يُفحص بـ JSON.parse. التلف (خلط أجزاء نسختين) يقع عند حدود الأجزاء فقط، فتنجو العناصر داخلها. */
+export function salvageItems(txt) {
+  const out = []; const seen = new Set(); const pat = '{"id":"'; let pos = 0;
+  while ((pos = txt.indexOf(pat, pos)) !== -1) {
+    let depth = 0, inStr = false, esc = false, end = -1;
+    for (let i = pos; i < txt.length; i++) {
+      const ch = txt[i];
+      if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true; else if (ch === '{' || ch === '[') depth++; else if (ch === '}' || ch === ']') { depth--; if (depth === 0) { end = i; break; } }
+      if (i - pos > 20000000) break;
+    }
+    if (end > 0) { try { const o = JSON.parse(txt.slice(pos, end + 1)); if (o && o.id && !seen.has(o.id)) { seen.add(o.id); out.push(o); } pos = end + 1; continue; } catch { } }
+    pos += pat.length;
+  }
+  return out;
+}
+
+function corruptErr(key, why) {
+  const e = new Error('data-corrupt: ' + key + ' (' + why + ')');
+  e.code = 'data-corrupt';
+  return e;
+}
+
+async function fsRead(f, key) {
+  const snap = await f.getDoc(f.doc(f.db, COL, docId(key)));
+  if (!snap.exists()) { loadedStamp.delete(key); memDocs.delete(key); return undefined; }
+  const d = snap.data();
+  const st0 = stampOf(d); const mc = memDocs.get(key);
+  if (st0 && (d.parts || 1) > 1 && mc && mc.st === st0) { loadedStamp.set(key, st0); return JSON.parse(JSON.stringify(mc.v)); }
+  const v = await fsAssemble(f, key, d);
+  if (st0 && (d.parts || 1) > 1 && v !== undefined) memDocs.set(key, { st: st0, v: JSON.parse(JSON.stringify(v)) });
+  // v29.5: البصمة تُحفظ لكل مستند موجود (حتى الفارغ) — عليها تعتمد الكتابة المشروطة
+  const st = stampOf(d); if (st) loadedStamp.set(key, st); else loadedStamp.delete(key);
+  return v;
+}
+
+// v34.3: قراءة ذرّية للرأس وكل الأجزاء داخل معاملة (من الخادم مباشرة، لقطة واحدة متسقة) — تمنع خلط رأس جديد
+// بأجزاء قديمة أثناء كتابة جهاز آخر، أو أجزاء من ذاكرة الجهاز المؤقتة، وهو ما كان يظهر «تالفًا» دون أن يكون كذلك
+async function fsReadTx(f, key) {
+  let out;
+  await f.runTransaction(f.db, async (tx) => {
+    const h = await tx.get(f.doc(f.db, COL, docId(key)));
+    if (!h.exists()) { out = { none: true }; return; }
+    const d = h.data() || {}; const parts = d.parts || 1;
+    if (!Number.isInteger(parts) || parts < 1 || parts > MAX_PARTS) throw corruptErr(key, 'parts=' + d.parts);
+    if (parts === 1) { out = { d, txt: d.value || '' }; return; }
+    let txt = '';
+    for (let i = 0; i < parts; i++) { const c = await tx.get(chunkRef(f, key, d.ver, i)); const ch = c.exists() ? (c.data() || {}).chunk : undefined; if (typeof ch !== 'string') throw corruptErr(key, 'chunk ' + i); txt += ch; }
+    out = { d, txt };
+  });
+  if (out.none) { loadedStamp.delete(key); return undefined; }
+  if (!out.txt) return undefined;
+  let v; try { v = JSON.parse(out.txt); } catch { throw corruptErr(key, 'json'); }
+  const st = stampOf(out.d); if (st) loadedStamp.set(key, st); else loadedStamp.delete(key);
+  return v;
+}
+
+// v28.1: المستند التالف (جزء مفقود أو JSON غير صالح) يُرمى كخطأ صريح — كان يُعاد undefined فيُعامل كمستند
+// غير موجود، ثم يكتب التطبيق نسخة فارغة فوقه
+async function fsAssemble(f, key, d) {
+  if (!d) return undefined;
+  const parts = d.parts || 1;
+  if (!Number.isInteger(parts) || parts < 1 || parts > MAX_PARTS) throw corruptErr(key, 'parts=' + d.parts);
+  if (parts === 1) {
+    if (!d.value) return undefined;
+    try { return JSON.parse(d.value); } catch { throw corruptErr(key, 'json'); }
+  }
+  // v29.0: الأجزاء تُقرأ معًا بالتوازي بدل واحدٍ تلو الآخر — الترتيب محفوظ بفهرس المصفوفة
+  const snaps = await Promise.all(Array.from({ length: parts }, (_, i) => f.getDoc(chunkRef(f, key, d.ver, i))));
+  const chunks = snaps.map((c, i) => {
+    const chunk = c.exists() ? (c.data() || {}).chunk : undefined;
+    if (typeof chunk !== 'string') throw corruptErr(key, 'chunk ' + i);
+    return chunk;
+  });
+  try { return JSON.parse(chunks.join('')); } catch { throw corruptErr(key, 'json'); }
+}
+
+// كتابة أجزاء نسخة جديدة على دفعات (كل دفعة تحت حد الطلب) — لا تمسّ الرأس ولا الأجزاء التي يقرؤها الآخرون
+async function fsWriteChunks(f, key, ver, chunks) {
+  for (let s = 0; s < chunks.length; s += CHUNK_BATCH) {
+    const part = chunks.slice(s, s + CHUNK_BATCH);
+    if (f.writeBatch) { const b = f.writeBatch(f.db); part.forEach((chunk, k) => b.set(chunkRef(f, key, ver, s + k), { chunk })); await b.commit(); }
+    else for (let k = 0; k < part.length; k++) await f.setDoc(chunkRef(f, key, ver, s + k), { chunk: part[k] });
+  }
+}
+// تفريغ أجزاء نسخة لم تعد مستخدمة (بعد مهلة كي لا ينقطع قارئ في منتصف قراءتها) — الحذف ممنوع بالقواعد فنُفرّغها
+function fsBlankLater(f, key, ver, parts) {
+  if (!parts || parts < 2) return;
+  setTimeout(async () => { try { for (let s = 0; s < parts; s += CHUNK_BATCH) { const b = f.writeBatch(f.db); for (let i = s; i < Math.min(parts, s + CHUNK_BATCH); i++) b.set(chunkRef(f, key, ver, i), { chunk: '' }); await b.commit(); } } catch { } }, 60000);
+}
+const newVer = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+
+async function fsWrite(f, key, val) {
+  const s = JSON.stringify(val);
+  const chunks = splitUtf8(s);
+  const parts = chunks.length;
+  if (parts > MAX_PARTS) { const e = new Error('doc-too-large: ' + key); e.code = 'doc-too-large'; throw e; }
+  const headRef = f.doc(f.db, COL, docId(key));
+  if (parts === 1) { const head = { parts, updatedAt: Date.now(), value: s, ...cvField() }; await f.setDoc(headRef, head); loadedStamp.set(key, stampOf(head)); return true; }
+  // v34.6: أجزاء بنسخة جديدة أولًا، ثم الرأس يشير إليها — القارئ يرى القديم كاملًا أو الجديد كاملًا، ولا حد لحجم المستند
+  let prev = null; try { const h = await f.getDoc(headRef); if (h.exists()) prev = h.data(); } catch { }
+  const ver = newVer();
+  await fsWriteChunks(f, key, ver, chunks);
+  const head = { parts, updatedAt: Date.now(), value: '', ver, ...cvField() };
+  await f.setDoc(headRef, head);
+  loadedStamp.set(key, stampOf(head)); memDocs.set(key, { st: stampOf(head), v: JSON.parse(s) });
+  if (prev && (prev.parts || 1) > 1) fsBlankLater(f, key, prev.ver || '', prev.parts);
+  return true;
+}
+
+/* v29.5 — كتابة مشروطة (compare-and-set): تُكتب القيمة فقط إن كان رأس المستند ما زال على النسخة التي قرأناها.
+   v34.6 — المستند الكبير: كانت الأجزاء تُكتب داخل المعاملة نفسها، فيتجاوز المستند الأكبر من ~10MB حد الطلب الواحد
+   وتفشل كل كتابة عليه. الآن تُكتب الأجزاء أولًا بنسخة جديدة خارج المعاملة، والمعاملة تتحقق من الرأس وتحوّله وحده. */
+async function fsWriteIf(f, key, val, expected) {
+  const s = JSON.stringify(val);
+  const chunks = splitUtf8(s);
+  const parts = chunks.length;
+  if (parts > MAX_PARTS) { const e = new Error('doc-too-large: ' + key); e.code = 'doc-too-large'; throw e; }
+  const headRef = f.doc(f.db, COL, docId(key));
+  const ver = parts > 1 ? newVer() : '';
+  if (parts > 1) await fsWriteChunks(f, key, ver, chunks);
+  const head = parts > 1 ? { parts, updatedAt: Date.now(), value: '', ver, ...cvField() } : { parts, updatedAt: Date.now(), value: s, ...cvField() };
+  let prev = null;
+  try {
+    await f.runTransaction(f.db, async (tx) => {
+      const cur = await tx.get(headRef);
+      const curStamp = cur.exists() ? stampOf(cur.data()) : null;
+      if ((curStamp || null) !== (expected || null)) { const e = new Error('conflict: ' + key); e.code = 'conflict'; throw e; }
+      prev = cur.exists() ? cur.data() : null;
+      tx.set(headRef, head);
+    });
+  } catch (e) { if (parts > 1) fsBlankLater(f, key, ver, parts); throw e; }   // أجزاء لم تُعتمد — تُفرَّغ
+  loadedStamp.set(key, stampOf(head)); if (parts > 1) memDocs.set(key, { st: stampOf(head), v: JSON.parse(s) }); else memDocs.delete(key);
+  if (prev && (prev.parts || 1) > 1 && (prev.ver || '') !== ver) fsBlankLater(f, key, prev.ver || '', prev.parts);
+  return true;
+}
+
+/* ================= خادم المشروع ================= */
+let useApi = true;
+const url = (k) => '/api/store/' + encodeURIComponent(k);
+
+/* ================= تخزين المتصفح ================= */
+const local = {
+  get(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : undefined; } catch { return undefined; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
+};
+
+/* v40.0 — رقم إصدار التطبيق في رأس كل مستند يُكتب: القواعد ترفض الكتابة من إصدار أقدم من الحد الأدنى (التحديث الإجباري) */
+let CLIENT_CV = 0;
+function cvField() { return CLIENT_CV ? { cv: CLIENT_CV } : {}; }
+
+/* ================= الواجهة الموحّدة ================= */
+export const cloud = {
+  setClientCv(n) { CLIENT_CV = Number(n) || 0; },
+  /** v9: قراءة تُفرّق بين «غير موجود» و«مرفوض بالصلاحيات» — أساس مسار إقلاع الفروع */
+  async tryGet(key) {
+    const f = await firestore();
+    if (f) {
+      try {
+        const v = await fsReadRetry(f, key);
+        failedReads.delete(key);
+        if (v !== undefined) { local.set(key, v); return { ok: true, value: v }; }
+        return { ok: true, value: undefined };
+      } catch (e) {
+        if (e && (e.code === 'permission-denied' || e.code === 'PERMISSION_DENIED')) {
+          try { localStorage.removeItem(key); } catch { }   // تنظيف نسخة محلية قديمة على جهاز غير مخوّل
+          return { ok: false, denied: true };
+        }
+        failedReads.add(key);
+        console.warn('قراءة Firestore فشلت:', e);
+        return { ok: true, value: local.get(key), failed: true };
+      }
+    }
+    const v = await this.get(key, undefined);
+    return { ok: true, value: v };
+  },
+
+  async get(key, def) {
+    const f = await firestore();
+    if (f) {
+      try {
+        const v = await fsReadRetry(f, key);
+        failedReads.delete(key);
+        if (v !== undefined) { local.set(key, v); return v; }
+        return def;
+      } catch (e) {
+        failedReads.add(key);
+        cloud.lastError = { key, op: 'get', code: String((e && e.code) || ''), at: Date.now() };
+        console.warn('قراءة Firestore فشلت:', e);
+      }
+    }
+    if (useApi && !FB_READY) {
+      try {
+        const r = await fetch(url(key));
+        if (r.ok) {
+          const j = await r.json();
+          if (j.value !== null && j.value !== undefined) { local.set(key, j.value); return j.value; }
+          return def;
+        }
+      } catch { useApi = false; }
+    }
+    const v = local.get(key);
+    return v === undefined ? def : v;
+  },
+
+  async set(key, val) {
+    const f = await firestore();
+    if (f) {
+      // v28.1: لا كتابة فوق مستند فشلت آخر قراءة له — ما في أيدينا قد يكون فارغًا أو قديمًا
+      if (failedReads.has(key)) {
+        cloud.lastError = { key, op: 'set', code: 'read-failed', at: Date.now() };
+        console.warn('رُفضت الكتابة: آخر قراءة لهذا المستند فشلت —', key);
+        return false;
+      }
+      if (quotaBlocked(key)) return false;
+      try { await fsWrite(f, key, val); local.set(key, val); return true; }
+      catch (e) {
+        if (isQuota(e)) quotaUntil = Date.now() + 15 * 60000;
+        cloud.lastError = { key, op: 'set', code: isQuota(e) ? 'resource-exhausted' : String((e && e.code) || ''), at: Date.now(), ...(isQuota(e) ? { until: quotaUntil } : {}) };   // v27.1: يقرؤه App لتمييز رفض الصلاحيات عن انقطاع الشبكة
+        console.warn('كتابة Firestore فشلت:', e);
+        // v15.18: أي فشل سحابي (صلاحيات أو شبكة أو غيره) = فشل صادق يعود للمنادي.
+        // سابقاً كان غير-الصلاحيات يسقط للتخزين المحلي «بنجاح» زائف، فتظهر البيانات
+        // للمستخدم لحظياً ثم «تختفي» عند أول مزامنة دورية تجلب نسخة السحابة الخالية منها
+        // (أوضح أعراضه: مسودة الكاشير/مدير الفرع تختفي بعد حفظها). الصدق يُظهر رسالة
+        // «تعذّر الحفظ — أعد المحاولة» بدل ضياع صامت.
+        return false;
+      }
+    }
+    // v15.18: سحابة مضبوطة لكن لا جلسة موثّقة بعد — كتابة محلية وحدها ستضيع حتماً عند
+    // أول قراءة سحابية ناجحة؛ نرفض بصدق بدل النجاح الوهمي.
+    if (FB_READY) return false;
+    if (useApi && !FB_READY) {
+      try {
+        const r = await fetch(url(key), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: val })
+        });
+        if (r.ok) { local.set(key, val); return true; }
+      } catch { useApi = false; }
+    }
+    return local.set(key, val);
+  },
+
+  /** استماع لحظي — يعيد دالة إلغاء الاشتراك، أو null إذا لم تكن الطبقة تدعمه */
+  subscribe(key, cb) {
+    if (!FB_READY) return null;
+    let stop = null, dead = false;
+    firestore().then(f => {
+      if (!f || dead) return;
+      stop = f.onSnapshot(f.doc(f.db, COL, docId(key)), async (snap) => {
+        if (!snap.exists()) return;
+        const d = snap.data(), st = stampOf(d);
+        // v29.0: نفس النسخة التي قُرئت للتو — لا تنزيل ولا إعادة رسم. الكتابات المحلية المعلّقة تمرّ كما كانت.
+        if (st && !snap.metadata?.hasPendingWrites && loadedStamp.get(key) === st && !failedReads.has(key)) return;
+        try {
+          const v = await fsAssemble(f, key, d);
+          if (st && v !== undefined) loadedStamp.set(key, st);
+          failedReads.delete(key);
+          if (v !== undefined) { local.set(key, v); cb(v); }
+        } catch (e) { failedReads.add(key); console.warn('استماع Firestore:', e); }
+      }, (e) => console.warn('انقطع الاستماع اللحظي:', e));
+    });
+    return () => { dead = true; if (stop) stop(); };
+  },
+
+  /** v29.5: كتابة مشروطة — تنجح فقط إن لم يكتب أحد على المستند منذ آخر قراءة له (get/tryGet/subscribe).
+   *  تعيد 'ok' أو 'conflict' (عدّل غيرك المستند — أعد القراءة والتعديل) أو 'fail'. بلا Firestore: كتابة عادية. */
+  async setIfUnchanged(key, val) {
+    const f = await firestore();
+    if (!f) return (await this.set(key, val)) ? 'ok' : 'fail';
+    if (failedReads.has(key)) { cloud.lastError = { key, op: 'set', code: 'read-failed', at: Date.now() }; return 'fail'; }
+    if (quotaBlocked(key)) return 'fail';
+    try { await fsWriteIf(f, key, val, loadedStamp.get(key) || null); local.set(key, val); return 'ok'; }
+    catch (e) {
+      if (e && e.code === 'conflict') return 'conflict';
+      if (isQuota(e)) quotaUntil = Date.now() + 15 * 60000;
+      cloud.lastError = { key, op: 'set', code: isQuota(e) ? 'resource-exhausted' : String((e && e.code) || ''), at: Date.now(), ...(isQuota(e) ? { until: quotaUntil } : {}) };
+      console.warn('كتابة Firestore المشروطة فشلت:', e);
+      return 'fail';
+    }
+  },
+
+  /** v28.1: هل فشلت آخر قراءة سحابية لهذا المفتاح؟ (الكتابة عليه مرفوضة حتى تنجح قراءة) */
+  readFailed(key) { return failedReads.has(key); },
+  /** v34.1: سبب آخر قراءة فاشلة {code, msg} */
+  readErr(key) { return readErrs.get(key) || null; },
+  /** v34.16: موعد استئناف الكتابة بعد نفاد الحصة (0 إن لم تكن موقوفة) */
+  quotaUntil() { return Date.now() < quotaUntil ? quotaUntil : 0; },
+
+  /** v34.1: فحص سلامة مستند سحابي دون تعديله: وجود الرأس، عدد الأجزاء، الأجزاء المفقودة، صلاحية JSON، الحجم */
+  async inspect(key) {
+    const f = await firestore();
+    if (!f) { const v = await this.get(key, undefined); return { key, mode: this.mode, exists: v !== undefined, parts: 1, missing: [], json: true, kb: Math.round(JSON.stringify(v === undefined ? '' : v).length / 1024), local: v !== undefined }; }
+    const out = { key, exists: false, parts: 0, missing: [], json: false, kb: 0, local: local.get(key) !== undefined };
+    try {
+      const snap = await f.getDoc(f.doc(f.db, COL, docId(key)));
+      if (!snap.exists()) return out;
+      const d = snap.data() || {}; out.exists = true; out.parts = d.parts || 1; out.updatedAt = d.updatedAt || null; out.ver = d.ver || '';
+      out.head = { valueType: Array.isArray(d.value) ? 'array' : typeof d.value, valueLen: d.value && d.value.length, keys: Object.keys(d).join(','), at: d.updatedAt ? new Date(d.updatedAt).toISOString().slice(0, 16) : '', start: typeof d.value === 'string' ? d.value.slice(0, 60) : '' };
+      let txt = '';
+      if (out.parts === 1) txt = d.value || '';
+      else {
+        const snaps = await Promise.all(Array.from({ length: out.parts }, (_, i) => f.getDoc(chunkRef(f, key, d.ver, i))));
+        snaps.forEach((c, i) => { const ch = c.exists() ? (c.data() || {}).chunk : undefined; if (typeof ch !== 'string') out.missing.push(i); else txt += ch; });
+      }
+      out.kb = Math.round(txt.length / 1024);
+      if (!out.missing.length) { try { JSON.parse(txt || 'null'); out.json = true; } catch { out.json = false; } }
+      // نسخة ثانية بقراءة ذرّية: إن نجحت فالتلف كان عابرًا (كتابة متزامنة) لا في البيانات نفسها
+      if (out.missing.length || !out.json) { try { await fsReadTx(f, key); out.txOk = true; } catch { out.txOk = false; } }
+      // بحث عن نسخة سحابية سليمة بعدد أجزاء مختلف (رأس لم يُحدَّث بعد كتابة الأجزاء أو العكس)
+      if (!out.txOk && (out.missing.length || !out.json)) {
+        // أرشيف المستندات التالف: نستخرج المستندات السليمة ونحفظ النص الخام كاملًا للنسخ الاحتياطي قبل أي استعادة
+        if (/^rms8:bf_/.test(key) && txt) { out.raw = txt; const its = salvageItems(txt); out.salvage = { items: its.filter(x => x.fileUrl || x.title) }; }
+        out.candidates = [];
+        for (let n = 1; n <= Math.min(MAX_PARTS, out.parts + 8); n++) {
+          if (n === out.parts) continue;
+          const cs = await Promise.all(Array.from({ length: n }, (_, i) => f.getDoc(chunkRef(f, key, '', i))));
+          if (cs.some(c => !c.exists() || typeof (c.data() || {}).chunk !== 'string')) { if (n > out.parts) break; else continue; }
+          const tt = cs.map(c => c.data().chunk).join('');
+          try { const v = JSON.parse(tt); out.candidates.push({ parts: n, kb: Math.round(tt.length / 1024), value: v }); } catch { }
+        }
+      }
+    } catch (e) { out.err = String((e && e.code) || (e && e.message) || e); }
+    out.localValue = local.get(key);
+    return out;
+  },
+  /** v34.3: استبدال مستند تالف بنسخة سليمة يختارها مسؤول النظام (من هذا الجهاز أو نسخة سحابية مكتشفة) */
+  async repairWith(key, val) {
+    const f = await firestore(); if (!f) return 'no-cloud';
+    try { await fsWrite(f, key, val); local.set(key, val); failedReads.delete(key); readErrs.delete(key); return 'ok'; }
+    catch (e) { return String((e && e.code) || 'fail'); }
+  },
+  /** v34.1: إصلاح مستند تالف بالنسخة السليمة المحفوظة على هذا الجهاز (للإدارة فقط وبتأكيد صريح من الواجهة) */
+  async repairFromLocal(key) {
+    const f = await firestore(); if (!f) return 'no-cloud';
+    const v = local.get(key); if (v === undefined) return 'no-local';
+    try { await fsWrite(f, key, v); failedReads.delete(key); readErrs.delete(key); return 'ok'; }
+    catch (e) { return String((e && e.code) || 'fail'); }
+  },
+
+  lastError: null,   // v27.1: آخر خطأ سحابي {key, op, code, at}
+  get mode() { return FB_READY ? 'firestore' : (useApi ? 'server' : 'local'); },
+  get live() { return FB_READY; }
+};
+
+// v29.6: تحميل مكتبة قاعدة البيانات في الخلفية أثناء شاشة الدخول (وقت الخمول) — فلا ينتظرها المستخدم بعد إدخال كلمة السر
+if (FB_READY && typeof window !== 'undefined') {
+  const warm = () => { import('firebase/firestore').catch(() => { }); };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(warm, { timeout: 4000 }); else setTimeout(warm, 2500);
+}

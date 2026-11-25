@@ -1,0 +1,113 @@
+name: اختبار وبناء ونشر المنصة
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  # ===== 1) اختبارات قواعد أمان Firestore على المحاكي =====
+  rules-tests:
+    name: اختبارات قواعد الأمان (محاكي Firestore)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: تجهيز Java للمحاكي
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: تثبيت الحزم
+        run: npm ci
+      - name: تشغيل الاختبارات
+        run: npm run test:rules
+      # v56.0 (CI-V56-001): كانت البوابة تشغّل 3 ملفات من ~40 (المحاسبة والفوترة والنسخ) — الآن الحزمة كاملة كما يشغّلها npm test
+      - name: اختبارات المحرك والوحدات كاملة (npm test)
+        run: npm test
+
+  # ===== 1ب) اختبارات الواجهة: كل الشاشات على الجوال والحاسوب + تدفقات الرقابة (هدر، جرد أعمى، أرقام) =====
+  ui-tests:
+    name: اختبارات الواجهة (Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: تثبيت الحزم
+        run: npm ci
+      - name: تثبيت متصفح الاختبار
+        run: npx playwright install --with-deps chromium
+      - name: تشغيل اختبارات الواجهة
+        run: npm run test:ui
+
+  # ===== 2) بناء الواجهة =====
+  build:
+    name: بناء الواجهة
+    needs: [rules-tests, ui-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: تثبيت الحزم
+        run: npm ci
+
+      - name: بناء الواجهة
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_SENDER_ID: ${{ secrets.VITE_FIREBASE_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_AI_ENDPOINT: ${{ secrets.VITE_AI_ENDPOINT }}
+          VITE_AI_FEEDBACK_ENDPOINT: ${{ secrets.VITE_AI_FEEDBACK_ENDPOINT }}
+          VITE_FCM_VAPID_KEY: ${{ vars.VITE_FCM_VAPID_KEY || secrets.VITE_FCM_VAPID_KEY }}
+        run: npm run build
+
+      - name: التحقق من مخرجات البناء
+        run: |
+          test -f dist/index.html || { echo "::error::لم تُبنَ الواجهة"; exit 1; }
+          grep -q "firebaseapp.com" dist/assets/*.js \
+            || { echo "::error::إعدادات Firebase لم تُدمج — تحقق من أسرار المستودع"; exit 1; }
+          cp dist/index.html dist/404.html   # حتى تعمل الروابط المباشرة على GitHub Pages
+          echo "✅ البناء سليم" && du -sh dist
+
+      - name: رفع المخرجات لـ Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  # ===== 3) النشر على GitHub Pages =====
+  deploy:
+    name: النشر على GitHub Pages
+    needs: build
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - name: النشر
+        id: pages
+        uses: actions/deploy-pages@v4

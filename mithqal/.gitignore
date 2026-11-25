@@ -1,0 +1,18 @@
+node_modules
+dist
+dist-engine
+data/
+firestore-debug.log
+*.log
+tests/.cache
+# أسرار البيئة: كل ملفات .env بأي لاحقة (.env.local / .env.production …) — القالب وحده يُرفع
+.env
+.env.*
+!.env.example
+# مفاتيح وحسابات خدمة لا تُرفع أبدًا
+*.pem
+*.key
+service-account*.json
+*-firebase-adminsdk-*.json
+backups/
+.esb
