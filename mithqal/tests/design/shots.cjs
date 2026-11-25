@@ -31,6 +31,7 @@ async function go(p, label) {
     await snap(p, dev + '-01-home');
     if (dev === 'desktop') {
       for (const [lbl, n] of [['المحاسبة', '02-accounting'], ['نقطة البيع', '03-pos'], ['التقارير', '04-reports'], ['الإعدادات', '05-settings']]) { if (await go(p, lbl)) await snap(p, dev + '-' + n); }
+      if (await go(p, 'بيانات الشركة والنسخ الاحتياطي')) { const c = p.locator('[data-tenant-branding]'); if (await c.count()) { await c.scrollIntoViewIfNeeded(); await snap(p, dev + '-07-tenant-branding'); } else await snap(p, dev + '-07-company'); }
       await p.evaluate(() => { try { localStorage.setItem('rms8:mode', 'dark'); } catch {} }); await p.reload(); await p.waitForTimeout(2500); await snap(p, dev + '-06-home-dark');
     }
     await ctx.close();

@@ -4646,7 +4646,7 @@ function PlatformApp() {
             <div className="rp-brand">
               <span className="rp-lockup"><BrandLockup lang={isEn() ? 'en' : 'bi'} onDark height={46} /></span>
               <span className="rp-tag">{TX(BRAND_SUB)}</span>
-              {(org.company.name || org.company.logoUrl) && <span className="rp-co">{org.company.logoUrl && <img className="co-logo" src={org.company.logoUrl} alt="" />}{org.company.name}</span>}
+              {(() => { const TB = tenantBrand(org, { lang: isEn() ? 'en' : 'ar' }); const lg = TB.logoAlt || TB.logo; return TB.name || lg ? <span className="rp-co" data-tenant-side>{lg && <img className="co-logo" src={lg} alt="" />}{TB.name}</span> : null; })()}
             </div>
             <button className="btn sm gh sideclose" onClick={() => setDrawer(false)} title={TX('إخفاء القائمة')}>
               <X size={18} />
@@ -4706,8 +4706,9 @@ function PlatformApp() {
               </button>
             )}
             <span className="toplogo-mark rp-mark" style={{ width: 30, height: 30, fontSize: 15 }}>{BRAND_MARK()}</span>
-            <h1 className="toptitle">{safeTab === 'home' && org.company.name && org.company.logoUrl && <img className="co-logo co-logo-t" src={org.company.logoUrl} alt="" />}{safeTab === 'home' ? (org.company.name || TX('الرئيسية')) : TX(HR_TABS.includes(safeTab) ? 'الموارد البشرية' : (NAV.find(n => n.id === safeTab)?.ar || TAB_AR[safeTab] || ''))}</h1>
-            <span className="verbadge" style={{ fontSize: 11, color: '#10294A', background: 'var(--mint)', fontFamily: 'monospace', flexShrink: 0, padding: '3px 8px', borderRadius: 6, fontWeight: 700, alignSelf: 'center' }}>{APP_VER}</span>
+            <h1 className="toptitle">{safeTab === 'home' ? TX('الرئيسية') : TX(HR_TABS.includes(safeTab) ? 'الموارد البشرية' : (NAV.find(n => n.id === safeTab)?.ar || TAB_AR[safeTab] || ''))}</h1>
+            <TenantChip org={org} dark={mode === 'dark'} />
+            <span className="verbadge" style={{ fontSize: 11, color: 'var(--mithqal-navy,#10294A)', background: 'var(--mint)', fontFamily: 'monospace', flexShrink: 0, padding: '3px 8px', borderRadius: 6, fontWeight: 700, alignSelf: 'center' }}>{APP_VER}</span>
             <div className="topstatus">
               <div className="row avrow" style={{ gap: 0 }}>
                 {online.slice(0, 4).map((p, i) => (
@@ -5017,6 +5018,13 @@ const GateCover = () => (
   <div className="gate-cover mq-cover" role="img" aria-label={TX(BRAND_AR) + ' — ' + TX(BRAND_SUB)}>
     <div className="mq-cover-in"><BrandLockup lang="bi" height={86} /><div className="mq-cover-sub" dir="auto">{TX(BRAND_SUB)}</div></div>
   </div>);
+/* v56.0 — موضع هوية المنشأة في الشريط العلوي: شعارها (البديل في الوضع الداكن) واسمها بلونها — منفصل عن رمز MITHQAL الثابت */
+function TenantChip({ org, dark }) {
+  const TB = tenantBrand(org, { lang: isEn() ? 'en' : 'ar' });
+  if (!TB.name && !TB.logo) return null;
+  const lg = dark ? (TB.logoAlt || TB.logo) : TB.logo;
+  return <span className="tn-chip" data-tenant-chip title={TB.name} style={{ '--tbp': TB.colors.primary }}>{lg ? <img src={lg} alt="" /> : <span className="tn-ini">{(TB.name || '').slice(0, 1)}</span>}<span className="tn-name">{TB.name}</span></span>;
+}
 function BrandHead({ title, sub, logo }) {
   // v47.2: العلامة أعلاه دائمًا شعار النظام «مِثقال»؛ شعار الشركة (logo) يظهر بجانب اسمها في العنوان
   return (
@@ -5455,7 +5463,7 @@ function Gate({ css, org, onLogin, online, theme, notice }) {
       <style dangerouslySetInnerHTML={{ __html: css }} />
       <div className="gate has-cover"><GateCover />
         <div className="gate-c">
-          <BrandHead title={org.company?.name || TX(BRAND)} sub={TX(BRAND_AR) + ' — ' + TX(BRAND_SUB)} logo={org.company?.logoUrl} />
+          <BrandHead title={org.company?.name || TX(BRAND)} sub={TX(BRAND_AR) + ' — ' + TX(BRAND_SUB)} logo={tenantBrand(org).logo} />
           <div className="row" style={{ justifyContent: 'center', marginBottom: 16 }}>
             <span className="badge b-mint"><span className="dot" />{online.length} متصل الآن</span>
             <span className="badge b-dim"><Lock size={10} />بيانات مشتركة ومؤمّنة</span>

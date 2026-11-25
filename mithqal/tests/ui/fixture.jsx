@@ -4,7 +4,9 @@
  *   #live/<comp>/<who>/<view> — عرض حيّ بحالة قابلة للتغيير: window.cur (البيانات) · window.as(who) · window.lastSay
  */
 import React from 'react'; import { createRoot } from 'react-dom/client';
-import * as M from '../../App.jsx'; import { CSS } from '../../styles.js'; import { domI18n } from '../../i18n.js';
+import * as M0 from '../../App.jsx'; import { TenantBranding } from '../../mods/admin/TenantBranding.jsx';
+const M = { ...M0, TenantBranding };   /* v56.0: شاشة هوية المنشأة */
+import { CSS } from '../../styles.js'; import { domI18n } from '../../i18n.js';
 // تاريخ محلي (مثل today() في المنصة) — toISOString يعطي تاريخ UTC فيختلف اليوم بين منتصف الليل و3 فجرًا بتوقيت الرياض
 const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); const dA = (k) => { const x = new Date(); x.setDate(x.getDate() - k); return iso(x); };
 const m = iso(new Date()).slice(0, 7);
@@ -63,7 +65,7 @@ function Live() {
     const ng = M.negStockChanges(g, o, nx); if (ng.length) { window.lastSay = 'لم يُحفظ — ' + M.negStockMsg(g, ng); return false; }
     const dp = M.findRecentDups(o, nx); if (dp.length) { window.lastSay = 'لم يُحفظ — ' + dp[0].msg; return false; }
     setO2(nx); return true; } catch (e) { window.lastErr = e.message; return false; } };
-  const commitOrg = async (fn) => { try { const nx = fn(JSON.parse(JSON.stringify(g))); setG(nx); return true; } catch (e) { window.lastErr = e.message; return false; } };
+  const commitOrg = async (fn, log) => { try { const nx = fn(JSON.parse(JSON.stringify(g))); setG(nx); if (log) (window.__orgLog = window.__orgLog || []).push(log); return true; } catch (e) { window.lastErr = e.message; return false; } };
   const myB = ME[who].branchId ? B.filter(x => x.id === ME[who].branchId) : B;   // فريق الفرع يرى فرعه فقط
   const P = { ...base, myBranches: myB, branches: myB, org: g, ops: o, scoped: o, me: ME[who], commit, commitOrg, invIntent: hv ? { v: hv, ts: 1 } : null, acctIntent: a === 'Accounting' && hv ? { v: hv, ts: 1 } : null };
   return React.createElement(React.Fragment, null, React.createElement(M[a], { key: who, ...P, ...(a === 'Hub' ? { hubId: hv.split(':')[0], view: hv.split(':')[1] } : {}) }),

@@ -3352,3 +3352,33 @@ test('v56.0 GAP-007 تعليق فاتورة السفري واستدعاؤها: �
   assert.deepEqual(tot, [300], 'المعلّق دُفع بالسعر الحالي: 2×110 + 80 (سحابة الاختبار تبدأ فارغة بعد إعادة الفتح)');
   assert.deepEqual(errs, []); await ctx.close();
 });
+
+test('v56.0 هوية المنشأة: رفع شعار شفاف، الألوان والاسمان والتذييل، معاينة حيّة بالمحرك نفسه، حفظ بسجل تدقيق، عرض فقط لغير المسؤول، واستعادة الافتراضي', async () => {
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR42mNk+M9QzwAEjDAGNzYAAA2nAf9ex9uYAAAAAElFTkSuQmCC', 'base64');
+  { const { p, errs, ctx } = await open({ viewport: { width: 1300, height: 1200 } }, 'live/TenantBranding/admin');
+    const card = p.locator('[data-tenant-branding]');
+    assert.match(await card.innerText(), /هوية المنصة \(MITHQAL\) ثابتة/);
+    await card.locator('[data-tb="nameAr"]').fill('مطاعم الواحة'); await card.locator('[data-tb="nameEn"]').fill('Oasis Restaurants');
+    await card.locator('[data-tb-file="logo"]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: PNG }); await p.waitForTimeout(300);
+    assert.match(await card.locator('[data-tb-logo="logo"] img').getAttribute('src'), /^data:image\/png;base64,/, 'الشعار PNG (الشفافية محفوظة)');
+    await card.locator('[data-tb-file="logoAlt"]').setInputFiles({ name: 'x.gif', mimeType: 'image/gif', buffer: PNG }); await p.waitForTimeout(200);
+    assert.match(await say(p), /PNG أو JPG أو WebP أو SVG/, 'صيغة مرفوضة');
+    await card.locator('[data-tb-color="primary"]').evaluate((el) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, '#0b6e4f'); el.dispatchEvent(new Event('input', { bubbles: true })); });
+    await card.locator('[data-tb="footer"]').fill('شكرًا لتعاملكم مع الواحة'); await p.waitForTimeout(300);
+    const pv = await card.locator('[data-tb-preview]').getAttribute('srcdoc');
+    assert.ok(pv.includes('مطاعم الواحة') && pv.includes('Oasis Restaurants') && pv.includes('--tb-p:#0B6E4F') && pv.includes('شكرًا لتعاملكم مع الواحة'), 'المعاينة من المحرك بهوية المنشأة');
+    assert.doesNotMatch(pv, /#10294A/i, 'لا ألوان المنصة في مستند المنشأة');
+    await card.locator('button:has-text("English")').click(); await p.waitForTimeout(250);
+    assert.match(await card.locator('[data-tb-preview]').getAttribute('srcdoc'), /dir="ltr"[\s\S]*Oasis Restaurants/);
+    await card.locator('[data-tb-save]').click(); await p.waitForTimeout(300);
+    const b = await p.evaluate(() => window.curOrg.branding);
+    assert.equal(b.nameEn, 'Oasis Restaurants'); assert.equal(b.colors.primary, '#0B6E4F'); assert.match(b.logo, /^data:image\/png/); assert.equal(b.logoAlt, '');
+    assert.equal((await p.evaluate(() => window.__orgLog || [])).filter(l => l.targetType === 'tenant_branding').length, 1, 'قيد تدقيق');
+    await card.locator('[data-tb-reset]').click(); await p.waitForTimeout(300);
+    assert.equal(await p.evaluate(() => window.curOrg.branding), undefined, 'عادت للافتراضي');
+    assert.deepEqual(errs, []); await ctx.close(); }
+  { const { p, errs, ctx } = await open({ viewport: { width: 1300, height: 1200 } }, 'live/TenantBranding/acc');
+    assert.equal(await p.locator('[data-tb-readonly]').count(), 1, 'المحاسب للعرض فقط');
+    assert.equal(await p.locator('[data-tb-save]').count(), 0); assert.equal(await p.locator('[data-tb="nameAr"]').isDisabled(), true);
+    assert.deepEqual(errs, []); await ctx.close(); }
+});

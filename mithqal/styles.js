@@ -1916,6 +1916,8 @@ table.tb.tb-fp{min-width:520px}
 .gate.has-cover .mq-bhead{display:none}
 .gate.has-cover .gate-cover.mq-cover{box-shadow:none !important}
 .gate:has(.mq-cover){background:#FFFFFF !important}
+/* v56.0 (DESIGN-V56-001): الوضع الداكن — جانب النموذج داكن (كان أبيض مفروضًا فيختفي عنوان المنشأة بلون النص الفاتح)؛ لوحة MITHQAL تبقى فاتحة كما قُرر */
+.rms.mode-dark .gate:has(.mq-cover),.mode-dark.gate:has(.mq-cover){background:var(--ink) !important}
 @media (max-width:959px){.gate.has-cover .gate-cover.mq-cover{aspect-ratio:auto;max-height:none;min-height:0;border-inline-end:0;border-bottom:1px solid #E3E7EE}.mq-cover-in{padding:22px 16px;gap:10px}.mq-cover-in .mq-lockup{transform:scale(.72);transform-origin:center}}
 @media (min-width:960px){
   .gate.has-cover{grid-template-columns:minmax(0,1.35fr) minmax(420px,1fr);place-items:stretch;padding:0 !important;gap:0}
@@ -1987,4 +1989,9 @@ table.tb.tb-fp{min-width:520px}
 .tb-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:var(--r-full);border:1px solid color-mix(in srgb,var(--tbp) 35%,var(--line));background:color-mix(in srgb,var(--tbp) 8%,var(--ink2));width:max-content;max-width:100%}
 .tb-chip img{height:28px;max-width:72px;object-fit:contain}.tb-chip b{color:var(--txt)}
 .tb-ini{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--tbp);color:#fff;font-weight:800}
+/* v56.0 — هوية المنشأة في الشريط العلوي (منفصلة عن رمز المنصة) */
+.tn-chip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:3px 10px 3px 4px;border-radius:var(--r-full);border:1px solid color-mix(in srgb,var(--tbp) 35%,var(--line));background:color-mix(in srgb,var(--tbp) 7%,var(--ink2));max-width:240px;min-width:0;flex-shrink:1;align-self:center}
+.tn-chip img{height:26px;max-width:64px;object-fit:contain;border-radius:6px}.tn-name{font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--txt)}
+.tn-ini{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--tbp);color:#fff;font-weight:800;font-size:12px;flex-shrink:0}
+@media (max-width:720px){.tn-chip .tn-name{display:none}.tn-chip{padding:3px;flex-shrink:0;min-width:34px;justify-content:center}}
 `;
