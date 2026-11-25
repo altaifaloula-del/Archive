@@ -15,7 +15,7 @@
 :root[data-theme="dark"]{--bg:#0C121C;--card:#141C29;--fg:#E8EDF4;--muted:#9AA6B8;--line:#26324A;--chip:#1C2636;color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--ar);font-size:15px;line-height:1.7}
-.wrap{max-width:1200px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:28px}
+.wrap{max-width:1200px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:minmax(0,1fr);gap:28px}
 h1{font-size:clamp(26px,4vw,36px);line-height:1.25;margin:0;text-wrap:balance}
 h2{font-size:22px;margin:0;text-wrap:balance}
 .lead{color:var(--muted);margin:6px 0 0;max-width:68ch}
@@ -25,6 +25,7 @@ button{font:inherit;cursor:pointer}
 .btn:hover{border-color:var(--muted)} .btn:focus-visible,.chipb:focus-visible,.stage:focus-visible{outline:2px solid var(--la);outline-offset:2px}
 .bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:10px;border-bottom:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.bar{flex-wrap:nowrap}.chips{display:flex;gap:8px;overflow-x:auto;min-width:0;flex:1;padding-block:2px;scrollbar-width:thin}.chips .chipb{flex:none}
 .bar .lbl{font-size:13px;color:var(--muted);margin-inline-end:4px}
 .chipb{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:4px 12px 4px 6px;font-size:13px}
 .chipb[aria-pressed="true"]{border-color:var(--fg);box-shadow:inset 0 0 0 1px var(--fg)}
@@ -68,6 +69,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 @keyframes spin{from{transform:rotate(-90deg) scale(.8);opacity:0}}
 @keyframes twist{from{transform:rotate(-45deg)}}
 @keyframes draw{from{stroke-dashoffset:100}}
+@keyframes stamp{from{transform:scale(1.45);opacity:0}70%{transform:scale(.94);opacity:1}}
+@keyframes pop0{from{transform:scale(.6);opacity:0}}
 @keyframes wave{from{transform:scale(0);opacity:0}}
 @keyframes wm{from{transform:translateX(14px);opacity:0}}
 @media (prefers-reduced-motion:reduce){.play .pc,.play .wm{animation:none}}
@@ -92,19 +95,25 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 
 <div class="wrap">
   <header>
-    <h1>أشمل — سبعة رموز وسبعة نماذج ألوان</h1>
+    <h1>أشمل — أربعة عشر رمزًا وأربعة عشر نموذج ألوان</h1>
     <p class="lead">كل رمز يجمع بين معنى الاسم (الشمول والإحاطة) ومحتوى المنصة (المالية، المبيعات، المخزون، الموارد، التقارير). اضغط أي شعار لإعادة تحريكه، واختر نموذجًا لونيًا من الشريط ليُطبَّق على كل الرموز.</p>
   </header>
 
-  <nav class="bar" aria-label="النماذج اللونية"><span class="lbl">الألوان:</span><span id="chips" style="display:contents"></span><button class="btn" id="replay" type="button" style="margin-inline-start:auto">تشغيل كل الحركات</button></nav>
+  <nav class="bar" aria-label="النماذج اللونية"><span class="lbl">الألوان:</span><div id="chips" class="chips"></div><button class="btn" id="replay" type="button" style="margin-inline-start:auto">تشغيل كل الحركات</button></nav>
 
+  <div id="allLogos" style="display:grid;gap:28px">
   <section aria-labelledby="h-logos" style="display:grid;gap:14px">
-    <div class="sec-h"><div><h2 id="h-logos">الرموز السبعة</h2><p class="lead">الشعار الكامل على الفاتح، والنسخة المعكوسة على الداكن، وأيقونة التطبيق، والأحجام الصغيرة حتى 16 بكسل.</p></div></div>
+    <div class="sec-h"><div><h2 id="h-logos">الدفعة الأولى: الرموز 1–7</h2><p class="lead">الشعار الكامل على الفاتح، والنسخة المعكوسة على الداكن، وأيقونة التطبيق، والأحجام الصغيرة حتى 16 بكسل.</p></div></div>
     <div class="grid" id="logos"></div>
   </section>
+  <section aria-labelledby="h-logos2" style="display:grid;gap:14px">
+    <div class="sec-h"><div><h2 id="h-logos2">الدفعة الثانية: الرموز 8–14</h2><p class="lead">اتجاهات جديدة: دورة العمل، الاعتماد، السجل، البناء، العلامة القصيرة، الأداء، والتكامل.</p></div></div>
+    <div class="grid" id="logos2"></div>
+  </section>
+  </div>
 
   <section aria-labelledby="h-pal" style="display:grid;gap:14px">
-    <div class="sec-h"><div><h2 id="h-pal">النماذج اللونية السبعة</h2><p class="lead">لكل نموذج: الأساسي، والإبراز، والداكن، والخلفية الفاتحة، والنص. نسب التباين محسوبة؛ ‎4.5 فأكثر صالح للنص، و‎3 فأكثر صالح للأشكال والأيقونات.</p></div></div>
+    <div class="sec-h"><div><h2 id="h-pal">النماذج اللونية (1–7 الأولى، و8–14 الجديدة)</h2><p class="lead">لكل نموذج: الأساسي، والإبراز، والداكن، والخلفية الفاتحة، والنص. نسب التباين محسوبة؛ ‎4.5 فأكثر صالح للنص، و‎3 فأكثر صالح للأشكال والأيقونات.</p></div></div>
     <div class="pals" id="pals"></div>
   </section>
 
@@ -166,6 +175,53 @@ const LOGOS = [
    parts: () => { const u = 24, g = 4, X = i => 12 + i * (u + g), out = [];
      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) out.push({ k: 'rect', x: X(c), y: X(r), w: u, h: u, rx: 5, f: r === 1 && c === 1 ? 'a' : 'p', an: 'wave', i: Math.abs(r - 1) + Math.abs(c - 1) === 0 ? 0 : (Math.abs(r - 1) + Math.abs(c - 1)) * 1.6 });
      return out; } },
+ // ===== الدفعة الثانية =====
+ { id: 8, b: 2, name: 'دورة الأعمال', rec: true, tagTxt: 'مرشّح الدفعة الثانية',
+   idea: 'ثلاث شفرات تدور حول مثلث ذهبي: الشراء ثم المخزون ثم البيع، وكلها تصب في الحسابات. «أشمل» يعني أن الدورة كلها في مكان واحد.',
+   motion: 'الشفرات تدخل تباعًا في اتجاه الدوران، ثم يظهر المثلث في المركز.',
+   parts: () => { const V = r => [-90, 30, 150].map(d => [50 + r * Math.cos(d * Math.PI / 180), 50 + r * Math.sin(d * Math.PI / 180)]);
+     const T = V(15), L = 34, W = 15, g = 3, f = v => v.map(([x, y]) => [+x.toFixed(2), +y.toFixed(2)]);
+     const blades = [0, 1, 2].map(k => { const A = T[k], B = T[(k + 1) % 3], len = Math.hypot(B[0] - A[0], B[1] - A[1]), d = [(B[0] - A[0]) / len, (B[1] - A[1]) / len];
+       let nx = d[1], ny = -d[0]; const mxp = (A[0] + B[0]) / 2 - 50, myp = (A[1] + B[1]) / 2 - 50; if (nx * mxp + ny * myp < 0) { nx = -nx; ny = -ny; }
+       const a0 = [A[0] + d[0] * g + nx * g, A[1] + d[1] * g + ny * g], a1 = [B[0] + d[0] * (L - len) + nx * g, B[1] + d[1] * (L - len) + ny * g];
+       const tip = [a1[0] + d[0] * W + nx * W, a1[1] + d[1] * W + ny * W].map((v, q) => q ? v : v);
+       return f([a0, [a1[0] + d[0] * W * .0 , a1[1]], [a1[0] + nx * W + d[0] * W, a1[1] + ny * W + d[1] * W], [a0[0] + nx * W + d[0] * W, a0[1] + ny * W + d[1] * W]]); });
+     return [ ...blades.map((b, n) => poly(b, 'p', 'spin', n * 1.4, { o: 'view' })), poly(f(V(11)), 'a', 'pop', 5) ]; } },
+ { id: 9, b: 2, name: 'الختم',
+   idea: 'ختم معتمد بعلامة صح ذهبية: فواتير مطابقة للزكاة والضريبة، وقيود معتمدة، وثقة في كل رقم.',
+   motion: 'الختم يُطبع بضغطة، ثم تُرسم علامة الصح.',
+   parts: () => { const pts = []; for (let n = 0; n < 32; n++) { const r = n % 2 ? 37 : 42, t = (n * 11.25 - 90) * Math.PI / 180; pts.push([+(50 + r * Math.cos(t)).toFixed(2), +(50 + r * Math.sin(t)).toFixed(2)]); }
+     return [ poly(pts, 'p', 'stamp', 0), { k: 'path', d: 'M33 51 L45 63 L68 38', f: 'a', stroke: 9, cap: 1, an: 'draw', i: 4 } ]; } },
+ { id: 10, b: 2, name: 'الدفتر',
+   idea: 'صفحات دفتر الأستاذ متراكبة بعلامة ذهبية: السجل المحاسبي الواحد الذي تُكتب فيه كل العمليات.',
+   motion: 'الصفحات تنفرد من خلف الصفحة الأمامية، ثم تنزل العلامة.',
+   parts: () => [ { k: 'rect', x: 14, y: 12, w: 54, h: 62, rx: 6, f: 'p', an: 'fly', i: 2, dx: '12px', dy: '12px', gap: 4 },
+     { k: 'rect', x: 22, y: 20, w: 54, h: 62, rx: 6, f: 'p', an: 'fly', i: 1, dx: '8px', dy: '8px', gap: 4 },
+     { k: 'rect', x: 30, y: 28, w: 54, h: 62, rx: 6, f: 'p', an: 'pop0', i: 0, gap: 4 },
+     poly([[66, 28], [76, 28], [76, 52], [71, 47], [66, 52]], 'a', 'drop', 4) ] },
+ { id: 11, b: 2, name: 'الهرم المتكامل',
+   idea: 'مثلث من أربعة أجزاء، قلبه ذهبي: أقسام المنصة الثلاثة تستند إلى قلب واحد، فيكتمل البناء.',
+   motion: 'الأركان الثلاثة تنضم من الخارج، ثم ينقلب القلب الذهبي إلى مكانه.',
+   parts: () => { const sh = (t, k = .86) => { const cx = (t[0][0] + t[1][0] + t[2][0]) / 3, cy = (t[0][1] + t[1][1] + t[2][1]) / 3; return t.map(([x, y]) => [+(cx + (x - cx) * k).toFixed(2), +(cy + (y - cy) * k).toFixed(2)]); };
+     const A = [50, 10], B = [90, 86], C = [10, 86], ab = [70, 48], ac = [30, 48], bc = [50, 86];
+     return [ poly(sh([A, ab, ac]), 'p', 'fly', 0, { dy: '-16px' }), poly(sh([ac, bc, C]), 'p', 'fly', 1, { dx: '-16px', dy: '10px' }), poly(sh([ab, B, bc]), 'p', 'fly', 2, { dx: '16px', dy: '10px' }),
+       poly(sh([ac, ab, bc]), 'a', 'pop', 4) ]; } },
+ { id: 12, b: 2, name: 'النقاط الثلاث',
+   idea: 'نقاط الشين الثلاث في «أشمل» داخل مربع واحد: علامة قصيرة جدًا تُعرف من بعيد، وتصلح أيقونة تطبيق مثالية.',
+   motion: 'المربع يظهر، ثم تهبط النقاط الثلاث تباعًا.',
+   parts: () => [ { k: 'rect', x: 8, y: 8, w: 84, h: 84, rx: 20, f: 'p', an: 'pop0', i: 0 },
+     poly([[50, 22], [63, 35], [50, 48], [37, 35]], 'a', 'drop', 2), poly([[35, 49], [48, 62], [35, 75], [22, 62]], 'a', 'drop', 3), poly([[65, 49], [78, 62], [65, 75], [52, 62]], 'a', 'drop', 4) ] },
+ { id: 13, b: 2, name: 'النبض',
+   idea: 'خط أداء صاعد داخل مربع، ينتهي بنقطة ذهبية: التقارير الحية ولوحات المتابعة التي ترى المنشأة كلها في لحظة.',
+   motion: 'المربع يظهر، ثم يُرسم الخط، ثم تضيء النقطة في القمة.',
+   parts: () => [ { k: 'rect', x: 8, y: 8, w: 84, h: 84, rx: 20, f: 'p', an: 'pop0', i: 0 },
+     { k: 'path', d: 'M22 68 L39 51 L53 60 L74 36', f: 'a', stroke: 8, cap: 1, an: 'draw', i: 2 }, { k: 'circle', cx: 75, cy: 35, r: 7.5, f: 'a', an: 'pop', i: 6 } ] },
+ { id: 14, b: 2, name: 'الخلية',
+   idea: 'سداسي من ستة أجزاء كخلية النحل: منظمة واحدة متكاملة، وجزء ذهبي يمثل القسم الذي تعمل عليه الآن.',
+   motion: 'الأجزاء تظهر واحدًا بعد الآخر مع عقارب الساعة.',
+   parts: () => { const V = Array.from({ length: 6 }, (_, k) => { const t = (-90 + 60 * k) * Math.PI / 180; return [50 + 42 * Math.cos(t), 50 + 42 * Math.sin(t)]; });
+     return V.map((v, k) => { const w = V[(k + 1) % 6], t = [[50, 50], v, w], cx = (50 + v[0] + w[0]) / 3, cy = (50 + v[1] + w[1]) / 3;
+       return poly(t.map(([x, y]) => [+(cx + (x - cx) * .84).toFixed(2), +(cy + (y - cy) * .84).toFixed(2)]), k === 0 ? 'a' : 'p', 'wave', k); }); } },
 ];
 
 function svg(L, size) {
@@ -175,29 +231,32 @@ function svg(L, size) {
     const o = p.o ? ` data-o="${p.o}"` : '';
     const gap = p.gap ? ` stroke="var(--tb)" stroke-width="${p.gap}" paint-order="stroke"` : '';
     if (p.k === 'polygon') return `<polygon class="pc"${o} style="${st}" points="${P(p.pts)}" fill="${fill}"${gap}/>`;
-    if (p.k === 'rect') return `<rect class="pc"${o} style="${st}" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${p.rx}" fill="${fill}"/>`;
+    if (p.k === 'rect') return `<rect class="pc"${o} style="${st}" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${p.rx}" fill="${fill}"${gap}/>`;
     if (p.k === 'circle') return `<circle class="pc"${o} style="${st}" cx="${p.cx}" cy="${p.cy}" r="${p.r}" fill="${fill}"/>`;
-    return `<path class="pc"${o} style="${st}" d="${p.d}" fill="none" stroke="${fill}" stroke-width="${p.stroke}" pathLength="100" stroke-dasharray="100"/>`;
+    return `<path class="pc"${o} style="${st}" d="${p.d}" fill="none" stroke="${fill}" stroke-width="${p.stroke}"${p.cap ? ' stroke-linecap="round" stroke-linejoin="round"' : ''} pathLength="100" stroke-dasharray="100"/>`;
   }).join('');
   return `<svg class="sym" viewBox="0 0 100 100"${size ? ` width="${size}" height="${size}"` : ''} aria-hidden="true">${parts}</svg>`;
 }
 const wm = `<span class="wm"><b>أشمل</b><small>ASHMAL</small></span>`;
-const logos = document.getElementById('logos');
-logos.innerHTML = LOGOS.map(L => `
+const card = L => `
  <article class="card${L.rec ? ' feat' : ''}">
    <div class="stage" role="button" tabindex="0" aria-label="إعادة تحريك شعار ${L.name}">${svg(L)}${wm}</div>
    <div style="display:grid;gap:10px;min-width:0">
-     <div class="meta"><h3>${L.name}${L.rec ? '<span class="tag rec">الأقرب لطلبك: يدمج الاسم والمحتوى</span>' : ''}</h3><p>${L.idea}</p><p class="mo"><span>الحركة:</span> ${L.motion}</p></div>
+     <div class="meta"><h3><span class="tag">${L.n}</span>${L.name}${L.rec ? `<span class="tag rec">${L.tagTxt || 'الأقرب لطلبك: يدمج الاسم والمحتوى'}</span>` : ''}</h3><p>${L.idea}</p><p class="mo"><span>الحركة:</span> ${L.motion}</p></div>
      <div class="tiles"><div class="stage dk" role="button" tabindex="0" aria-label="إعادة تحريك النسخة الداكنة">${svg(L)}${wm}</div><div class="icon">${svg(L)}</div></div>
      <div class="foot"><div class="sizes">${[48, 32, 24, 16].map(s => svg(L, s)).join('')}<span style="font-size:12px;color:var(--muted)">48 · 32 · 24 · 16</span></div><button class="btn" type="button" data-replay>إعادة التحريك</button></div>
    </div>
- </article>`).join('');
+ </article>`;
+LOGOS.forEach((L, k) => L.n = k + 1);
+document.getElementById('logos').innerHTML = LOGOS.filter(L => !L.b).map(card).join('');
+document.getElementById('logos2').innerHTML = LOGOS.filter(L => L.b === 2).map(card).join('');
+const logos = document.getElementById('allLogos');
 
 function play(el) { el.classList.remove('play'); void el.getBoundingClientRect(); el.classList.add('play'); }
 logos.addEventListener('click', e => { const s = e.target.closest('.stage'); if (s) return play(s);
   const b = e.target.closest('[data-replay]'); if (b) b.closest('.card').querySelectorAll('.stage,.icon').forEach(play); });
 logos.addEventListener('keydown', e => { const s = e.target.closest('.stage'); if (s && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); play(s); } });
-const playAll = () => document.querySelectorAll('#logos .stage, #logos .icon').forEach((el, n) => setTimeout(() => play(el), n * 70));
+const playAll = () => document.querySelectorAll('#allLogos .stage, #allLogos .icon').forEach((el, n) => setTimeout(() => play(el), n * 45));
 document.getElementById('replay').addEventListener('click', playAll);
 
 // ===== النماذج اللونية =====
@@ -209,6 +268,13 @@ const PALS = [
  { n: 'البنفسجي العميق والكهرماني', m: 'مميز وغير مستهلك في سوق المحاسبة؛ طابع منتج برمجي عصري.', c: ['#34205E', '#F2B33D', '#1C1036', '#F6F3FB', '#221A33'] },
  { n: 'الليلي والسماوي', m: 'بيانات وذكاء وتقارير؛ هادئ ومريح لساعات العمل الطويلة.', c: ['#0B1F3A', '#2F9BF0', '#06121F', '#F2F7FC', '#14202F'] },
  { n: 'الأخضر السعودي والرملي', m: 'هوية محلية واضحة (الأخضر والرمل)؛ يخاطب السوق السعودي مباشرة.', c: ['#00634A', '#C9A46A', '#003A2B', '#F7F4EE', '#1C2520'] },
+ { n: 'العنابي والذهبي', m: 'فخامة وأصالة؛ يناسب المنشآت العائلية والقطاعات الراقية.', c: ['#6B1E2E', '#D9A83E', '#3D0F19', '#FAF4F2', '#2A1418'] },
+ { n: 'البترولي والمرجاني', m: 'دافئ وودود مع جدية مهنية؛ مختلف عن الأزرق المعتاد في برامج المحاسبة.', c: ['#0F5257', '#F26B5B', '#082F32', '#F1F7F7', '#14292B'] },
+ { n: 'الجرافيتي والليموني', m: 'تقني وحيوي؛ الليموني لون نمو وإنجاز، مع رمادي صلب.', c: ['#22262E', '#9BCB3C', '#121418', '#F4F6F2', '#22262E'] },
+ { n: 'الأزرق الملكي والذهبي', m: 'كلاسيكي واثق وأفتح من الكحلي؛ يقرأ جيدًا على الشاشات الصغيرة.', c: ['#1D3F8F', '#E8B547', '#0F2357', '#F3F6FC', '#16203A'] },
+ { n: 'الزيتوني والرملي', m: 'طبيعي وهادئ؛ يناسب الأغذية والزراعة والمطاعم.', c: ['#3E4A2C', '#D8B878', '#232A18', '#F6F5EF', '#232A1C'] },
+ { n: 'الأسود والذهبي', m: 'فاخر وحاد؛ أقوى حضور في الطباعة والواجهات الداكنة.', c: ['#141414', '#C9A24A', '#000000', '#F5F4F1', '#141414'] },
+ { n: 'النيلي والنعناعي', m: 'عصري ومنعش؛ طابع منتجات البرمجيات الحديثة.', c: ['#28306F', '#3FD0A4', '#151A42', '#F3F4FB', '#1A1F3D'] },
 ];
 const lum = h => { const v = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(c => c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4); return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
 const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + .05) / (y + .05); };
